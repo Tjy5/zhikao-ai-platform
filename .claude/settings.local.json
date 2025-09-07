@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(python:*)",
+      "Bash(py --version)",
+      "Bash(/c/Users/10075/AppData/Local/Microsoft/WindowsApps/python -m venv .venv)",
+      "Bash(npx create-next-app:*)",
+      "Bash(tree:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(pip install:*)",
+      "Bash(.venv/Scripts/activate)",
+      "Bash(alembic init:*)",
+      "Bash(alembic revision:*)",
+      "Bash(alembic upgrade:*)",
+      "Bash(uvicorn:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm install)",
+      "Bash(npx next:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
