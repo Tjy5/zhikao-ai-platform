@@ -64,15 +64,58 @@ function Maybe-Migrate {
   }
 }
 
+function Find-FreePort {
+  param(
+    [int]$StartPort = 8001,
+    [int]$MaxAttempts = 100
+  )
+  
+  for ($i = 0; $i -lt $MaxAttempts; $i++) {
+    $port = $StartPort + $i
+    try {
+      # Try to bind to the port to see if it's available
+      $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Any, $port)
+      $listener.Start()
+      $listener.Stop()
+      # If we get here, port is available
+      Write-Host "[dev] Found free port: $port" -ForegroundColor Green
+      return $port
+    } catch {
+      # Port is in use, try next one
+      continue
+    }
+  }
+  
+  throw "No free port found in range $StartPort-$($StartPort + $MaxAttempts - 1)"
+}
+
 Push-Location $PSScriptRoot
 try {
   Ensure-Venv
   Ensure-Deps
   Maybe-Start-DB
   Maybe-Migrate
-  Write-Host "[dev] Starting Uvicorn on http://localhost:8001 (reload)" -ForegroundColor Green
-  uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+  
+  # Find a free port for the backend
+  $backendPort = Find-FreePort -StartPort 8001
+  
+  # Write port to file for other processes to read
+  $backendPortFile = Join-Path (Split-Path $PSScriptRoot -Parent) "backend_port.txt"
+  $backendPort | Out-File -FilePath $backendPortFile -Encoding utf8 -NoNewline
+  Write-Host "[dev] Backend port saved to: $backendPortFile" -ForegroundColor Green
+  
+  Write-Host "[dev] Starting Backend with uvicorn on port $backendPort" -ForegroundColor Green
+  Write-Host "[dev] Backend URL: http://localhost:$backendPort" -ForegroundColor Cyan
+  Write-Host "[dev] API Docs: http://localhost:$backendPort/docs" -ForegroundColor Cyan
+  
+  uvicorn app.main:app --reload --host 0.0.0.0 --port $backendPort
 } finally {
+  # Clean up port file when server stops
+  $backendPortFile = Join-Path (Split-Path $PSScriptRoot -Parent) "backend_port.txt"
+  if (Test-Path $backendPortFile) {
+    Remove-Item $backendPortFile -Force
+    Write-Host "[dev] Cleaned up backend port file" -ForegroundColor Yellow
+  }
   Pop-Location
 }
 

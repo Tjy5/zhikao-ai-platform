@@ -41,11 +41,56 @@ async def global_exception_handler(request: Request, exc: Exception):
         }
     )
 
-# Configure CORS middleware - allow all origins for development
+import os
+from pathlib import Path
+
+def get_cors_origins():
+    """Get CORS origins dynamically based on frontend port"""
+    origins = [
+        "http://localhost:3000",  # Default frontend port
+        "http://127.0.0.1:3000",
+    ]
+    
+    # Try to read frontend port from file
+    try:
+        frontend_port_file = Path(__file__).parent.parent.parent / "frontend_port.txt"
+        if frontend_port_file.exists():
+            frontend_port = frontend_port_file.read_text().strip()
+            origins.extend([
+                f"http://localhost:{frontend_port}",
+                f"http://127.0.0.1:{frontend_port}",
+            ])
+    except Exception:
+        pass
+    
+    # Add common development ports for localhost
+    for port in range(3000, 3010):
+        origins.extend([
+            f"http://localhost:{port}",
+            f"http://127.0.0.1:{port}",
+        ])
+    
+    # Add support for local network IP address
+    import socket
+    try:
+        # Get local IP address
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        
+        # Add local IP origins for common frontend ports
+        for port in [3000, 3001, 3002, 3003]:
+            origins.append(f"http://{local_ip}:{port}")
+    except Exception:
+        pass
+    
+    return list(set(origins))  # Remove duplicates
+
+# Configure CORS middleware with dynamic origins
+cors_origins = get_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=False,  # Must be False when using allow_origins=["*"]
+    allow_origins=cors_origins,
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
@@ -62,3 +107,14 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# Configuration reload endpoint (development only)
+@app.post("/reload-config")
+async def reload_config():
+    """重载配置文件（仅开发环境使用）"""
+    try:
+        from app.core.config import settings
+        settings.reload()
+        return {"status": "success", "message": "配置已重载"}
+    except Exception as e:
+        return {"status": "error", "message": f"重载失败: {str(e)}"}

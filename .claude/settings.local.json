@@ -17,7 +17,9 @@
       "Bash(uvicorn:*)",
       "Bash(npm run dev:*)",
       "Bash(npm install)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(curl:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

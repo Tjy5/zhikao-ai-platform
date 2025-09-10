@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+// Import API configuration
+import { API_BASE_URL } from '../config/api';
+
+const getApiUrl = () => {
+  return API_BASE_URL;
+};
 
 interface ScoreDetail {
   item: string;
@@ -16,6 +23,8 @@ interface GradingResult {
   feedback: string;
   suggestions: string[];
   scoreDetails?: ScoreDetail[];
+  questionType?: string;
+  questionTypeSource?: "ai" | "client" | string;
 }
 
 export default function Home() {
@@ -23,41 +32,33 @@ export default function Home() {
   const [myAnswer, setMyAnswer] = useState<string>("");
   const [gradingResult, setGradingResult] = useState<GradingResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [progress, setProgress] = useState<number>(0);
+  const progressTimerRef = useRef<NodeJS.Timer | null>(null);
+
+  const startProgress = () => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current as unknown as number);
+      progressTimerRef.current = null;
+    }
+    setProgress(0);
+    let current = 0;
+    progressTimerRef.current = setInterval(() => {
+      const inc = current < 60 ? 3 : current < 85 ? 1.5 : current < 95 ? 0.5 : 0.2;
+      current = Math.min(99, current + inc);
+      setProgress(current);
+    }, 200);
+  };
+
+  const finishProgress = () => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current as unknown as number);
+      progressTimerRef.current = null;
+    }
+    setProgress(100);
+  };
 
   // Display normalization: scale "fullScore" so that totals sum to 100
-  // Simple markdown-to-HTML converter for better control
-  const renderMarkdown = (text: string): string => {
-    if (!text) return text;
-    
-    const result = text
-      // Convert headers (**, ###, etc.)
-      .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold text-gray-800 mb-3 mt-6">$1</h3>')
-      .replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold text-gray-800 mb-3 mt-6">$1</h2>')
-      .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold text-gray-800 mb-4 mt-6">$1</h1>')
-      
-      // Convert strong text with better handling
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-blue-600">$1</strong>')
-      
-      // Convert list items with proper handling of complex content
-      .replace(/^- (.*$)/gm, '<li class="text-gray-700 leading-relaxed mb-2">$1</li>')
-      
-      // Wrap consecutive list items in ul tags
-      .replace(/((<li.*?>.*?<\/li>\s*)+)/g, '<ul class="list-disc list-outside mb-4 space-y-1 pl-6">$1</ul>')
-      
-      // Convert paragraphs (any line not starting with <)
-      .replace(/^(?!<)(.+)$/gm, '<p class="mb-4 text-gray-700 leading-relaxed">$1</p>')
-      
-      // Clean up multiple newlines
-      .replace(/\n+/g, '\n')
-      
-      // Convert actual newlines to proper spacing
-      .replace(/\n/g, '');
-    
-    console.log("Markdown render input:", text);
-    console.log("Markdown render output:", result);
-    
-    return result;
-  };
+  // Prefer ReactMarkdown rendering to preserve structure and bullets
 
   const displayScale = gradingResult?.scoreDetails?.length
     ? (() => {
@@ -77,11 +78,13 @@ export default function Home() {
     }
 
     setIsLoading(true);
+    startProgress();
     try {
       // 将题目材料和用户答案组合成完整内容
       const combinedContent = `【题目材料及问题】\n${questionMaterial}\n\n【我的答案】\n${myAnswer}`;
       
-      const response = await fetch("http://localhost:8001/api/v1/essays/grade", {
+      const apiUrl = getApiUrl();
+      const response = await fetch(`${apiUrl}/api/v1/essays/grade`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -96,50 +99,57 @@ export default function Home() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const raw: any = await response.json();
+      const raw: unknown = await response.json();
+      const rawRecord = raw as Record<string, unknown>;
       console.log("Raw grading result:", raw);
-      console.log("Raw feedback content:", raw?.feedback);
+      console.log("Raw feedback content:", rawRecord?.feedback);
       // Normalize API shape to ensure scoreDetails shows up
-      const toNumber = (v: any, def = 0) => {
-        const n = typeof v === "number" ? v : parseFloat(v);
+      const toNumber = (v: unknown, def = 0) => {
+        const n = typeof v === "number" ? v : parseFloat(String(v));
         return Number.isFinite(n) ? n : def;
       };
-      const normalizeDetails = (details: any): ScoreDetail[] | undefined => {
+      const normalizeDetails = (details: unknown): ScoreDetail[] | undefined => {
         if (!details) return undefined;
+        const detailsRecord = details as Record<string, unknown>;
         const arr = Array.isArray(details)
           ? details
-          : Array.isArray(details?.data)
-          ? details.data
-          : Array.isArray(details?.items)
-          ? details.items
-          : Array.isArray(details?.scoreDetails)
-          ? details.scoreDetails
-          : Array.isArray(details?.score_details)
-          ? details.score_details
+          : Array.isArray(detailsRecord?.data)
+          ? detailsRecord.data
+          : Array.isArray(detailsRecord?.items)
+          ? detailsRecord.items
+          : Array.isArray(detailsRecord?.scoreDetails)
+          ? detailsRecord.scoreDetails
+          : Array.isArray(detailsRecord?.score_details)
+          ? detailsRecord.score_details
           : undefined;
         if (!arr) return undefined;
         const mapped = arr
-          .map((d: any) => ({
-            item: d?.item ?? d?.name ?? d?.title ?? "",
-            fullScore: toNumber(d?.fullScore ?? d?.full_score ?? d?.full ?? d?.max ?? 100, 100),
-            actualScore: toNumber(d?.actualScore ?? d?.actual_score ?? d?.score ?? d?.value ?? 0, 0),
-            description: d?.description ?? d?.desc ?? d?.detail ?? "",
-          }))
+          .map((d: unknown) => {
+            const detail = d as Record<string, unknown>;
+            return {
+              item: String(detail?.item ?? detail?.name ?? detail?.title ?? ""),
+              fullScore: toNumber(detail?.fullScore ?? detail?.full_score ?? detail?.full ?? detail?.max ?? 100, 100),
+              actualScore: toNumber(detail?.actualScore ?? detail?.actual_score ?? detail?.score ?? detail?.value ?? 0, 0),
+              description: String(detail?.description ?? detail?.desc ?? detail?.detail ?? ""),
+            };
+          })
           .filter((d: ScoreDetail) => d.item !== "");
         return mapped.length ? mapped : undefined;
       };
 
       const normalized: GradingResult = {
-        score: toNumber(raw?.score, 0),
-        feedback: typeof raw?.feedback === "string" ? raw.feedback : String(raw?.feedback ?? ""),
-        suggestions: Array.isArray(raw?.suggestions)
-          ? raw.suggestions.map((s: any) => String(s))
-          : raw?.suggestions
-          ? [String(raw.suggestions)]
+        score: toNumber(rawRecord?.score, 0),
+        feedback: typeof rawRecord?.feedback === "string" ? rawRecord.feedback : String(rawRecord?.feedback ?? ""),
+        suggestions: Array.isArray(rawRecord?.suggestions)
+          ? (rawRecord.suggestions as unknown[]).map((s: unknown) => String(s))
+          : rawRecord?.suggestions
+          ? [String(rawRecord.suggestions)]
           : [],
         scoreDetails:
-          normalizeDetails(raw?.scoreDetails) ??
-          normalizeDetails(raw?.score_details),
+          normalizeDetails(rawRecord?.scoreDetails) ??
+          normalizeDetails(rawRecord?.score_details),
+        questionType: typeof rawRecord?.questionType === "string" ? rawRecord.questionType : undefined,
+        questionTypeSource: typeof rawRecord?.questionTypeSource === "string" ? rawRecord.questionTypeSource : undefined,
       };
 
       // As a last resort, synthesize a single detail if backend omitted it
@@ -160,7 +170,8 @@ export default function Home() {
       console.error("批改请求失败:", error);
       alert("批改请求失败，请检查网络连接或稍后重试");
     } finally {
-      setIsLoading(false);
+      finishProgress();
+      setTimeout(() => setIsLoading(false), 200);
     }
   };
 
@@ -214,6 +225,18 @@ export default function Home() {
           </div>
 
           {/* 提交按钮 */}
+          {isLoading && (
+            <div className="mb-4">
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 h-3 rounded-full transition-all duration-200 ease-out"
+                  style={{ width: `${Math.min(100, Math.round(progress))}%` }}
+                />
+              </div>
+              <div className="mt-2 text-xs text-gray-500 text-right">{Math.min(100, Math.round(progress))}%</div>
+            </div>
+          )}
+
           <div className="mb-8 text-center">
             <button
               onClick={handleSubmit}
@@ -246,6 +269,16 @@ export default function Home() {
           {/* 批改结果展示区域 */}
           {gradingResult && (
             <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl p-8 border border-gray-200 shadow-lg">
+              {gradingResult?.questionType && (
+                <div className="mb-4">
+                  <span className="inline-flex items-center text-sm text-gray-700 bg-white px-3 py-1 rounded-full border border-gray-200">
+                    识别题型：{gradingResult.questionType}
+                    {gradingResult.questionTypeSource === "ai" && (
+                      <span className="ml-2 text-xs text-blue-600">(AI 识别)</span>
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center">
                   <div className="w-3 h-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full mr-3 shadow-sm"></div>
@@ -339,11 +372,40 @@ export default function Home() {
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-700">
-                                  <div 
-                                    dangerouslySetInnerHTML={{ 
-                                      __html: renderMarkdown(detail.description) 
-                                    }} 
-                                  />
+                                  <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
+                                    <ReactMarkdown 
+                                      remarkPlugins={[remarkGfm]}
+                                      components={{
+                                        // 自定义markdown组件，突出显示关键信息
+                                        p: ({children}) => (
+                                          <p className="mb-2 last:mb-0">{children}</p>
+                                        ),
+                                        strong: ({children}) => (
+                                          <strong className="font-semibold text-gray-900">{children}</strong>
+                                        ),
+                                        // 为特殊标记添加样式
+                                        text: ({children}) => {
+                                          if (typeof children === 'string') {
+                                            if (children.includes('✅')) {
+                                              return <span className="text-green-700 font-medium">{children}</span>;
+                                            }
+                                            if (children.includes('⚠️')) {
+                                              return <span className="text-yellow-700 font-medium">{children}</span>;
+                                            }
+                                            if (children.includes('❌')) {
+                                              return <span className="text-red-700 font-medium">{children}</span>;
+                                            }
+                                            if (children.includes('💡')) {
+                                              return <span className="text-blue-700 font-medium">{children}</span>;
+                                            }
+                                          }
+                                          return <>{children}</>;
+                                        }
+                                      }}
+                                    >
+                                      {detail.description}
+                                    </ReactMarkdown>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -381,11 +443,9 @@ export default function Home() {
                   </h3>
                   <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                   <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
-                    <div 
-                      dangerouslySetInnerHTML={{ 
-                        __html: renderMarkdown(gradingResult.feedback) 
-                      }} 
-                    />
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {gradingResult.feedback}
+                  </ReactMarkdown>
                   </div>
                   </div>
                 </div>
