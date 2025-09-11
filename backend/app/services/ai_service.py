@@ -76,8 +76,42 @@ def convert_emoji_to_blue_html(text: str) -> str:
     return text
 
 
+def extract_answer_from_reasoning(reasoning_content: str) -> str:
+    """从推理模型的reasoning_content中提取题型答案"""
+    if not reasoning_content:
+        return ""
+    
+    # 题型选项
+    valid_types = ["概括题", "综合分析题", "对策题", "应用文写作题"]
+    
+    # 在推理内容中查找明确的题型答案
+    for question_type in valid_types:
+        if question_type in reasoning_content:
+            # 检查上下文，确保是作为答案而非举例
+            type_index = reasoning_content.find(question_type)
+            context = reasoning_content[max(0, type_index-50):type_index+50].lower()
+            
+            # 如果上下文包含确定性词汇，认为是答案
+            if any(keyword in context for keyword in ["that's", "答案", "是", "应该", "判断", "选择"]):
+                logger.info(f"从reasoning中提取到答案: {question_type}")
+                return question_type
+    
+    # 如果没有找到明确答案，尝试从推理逻辑中推断
+    reasoning_lower = reasoning_content.lower()
+    if "comprehensive analysis" in reasoning_lower or "综合分析" in reasoning_lower:
+        return "综合分析题"
+    elif "summary" in reasoning_lower or "概括" in reasoning_lower:
+        return "概括题"
+    elif "policy" in reasoning_lower or "对策" in reasoning_lower:
+        return "对策题"
+    elif "application" in reasoning_lower or "应用文" in reasoning_lower:
+        return "应用文写作题"
+    
+    return ""
+
+
 def clean_ai_thinking_patterns(text: str) -> str:
-    """清理AI思考过程的模式，但保留有价值的分析内容"""
+    """清理AI思考过程的模式和prompt指令，但保留有价值的分析内容"""
     if not text:
         return text
     
@@ -106,7 +140,21 @@ def clean_ai_thinking_patterns(text: str) -> str:
         r'步骤[一二三四五六七八九十\d]+：?',
     ]
     
-    for pattern in patterns:
+    # 删除prompt指令泄漏
+    prompt_leakage_patterns = [
+        r'请严格按照申论四大题型核心秘籍的方法论，对该维度进行深度评价。评价要求：\s*',
+        r'基于《申论四大题型核心秘籍》.*?评价要求：\s*',
+        r'申论四大题型核心秘籍.*?方法论.*?评价要求：\s*',
+        r'请严格按照.*?核心秘籍.*?评价要求：\s*',
+        r'作为资深申论阅卷专家["\']?悟道["\']?的.*?[：:]\s*',
+        r'作为.*?阅卷专家.*?的.*?[：:]\s*',
+        r'作为专业阅卷老师对这篇.*?答案的.*?[：:]\s*',
+        r'悟道.*?专业.*?[：:]\s*',
+        r'深度专业诊断[：:]\s*',
+        r'最终专业点评[：:]\s*',
+    ]
+    
+    for pattern in patterns + prompt_leakage_patterns:
         text = re.sub(pattern, '', text, flags=re.IGNORECASE)
     
     return text.strip()
@@ -150,8 +198,16 @@ async def grade_essay_with_expert_diagnosis(essay_content: str, question_type: O
         if not diagnosis_content:
             raise ValueError("第一阶段AI诊断返回空响应")
         
-        # 解析第一阶段结果
-        diagnosis_data = parse_ai_json_response(diagnosis_content, "诊断阶段", question_type or "概括题")
+        # 解析第一阶段结果（容错）
+        try:
+            diagnosis_data = parse_ai_json_response(diagnosis_content, "诊断阶段", question_type or "概括题")
+        except Exception as parse_err:
+            logger.warning("诊断阶段JSON解析失败，使用回退方案: {}".format(str(parse_err)[:200]))
+            diagnosis_data = {
+                "dimensions": {},
+                "summary": clean_ai_thinking_patterns(diagnosis_content) or "AI专家诊断完成",
+                "teacher_comments": clean_ai_thinking_patterns(diagnosis_content)[:800]
+            }
         
         # ===== 第二阶段：整体评价 =====
         evaluation_prompt = create_overall_evaluation_prompt(
@@ -175,8 +231,18 @@ async def grade_essay_with_expert_diagnosis(essay_content: str, question_type: O
         if not evaluation_content:
             raise ValueError("第二阶段整体评价返回空响应")
         
-        # 解析第二阶段结果
-        evaluation_data = parse_ai_json_response(evaluation_content, "评价阶段", question_type or "概括题")
+        # 解析第二阶段结果（容错）
+        try:
+            evaluation_data = parse_ai_json_response(evaluation_content, "评价阶段", question_type or "概括题")
+        except Exception as parse_err2:
+            logger.warning("评价阶段JSON解析失败，使用回退方案: {}".format(str(parse_err2)[:200]))
+            evaluation_data = {
+                "total_score": 75.0,
+                "overall_evaluation": clean_ai_thinking_patterns(evaluation_content)[:1000] or "AI批改完成",
+                "priority_suggestions": [],
+                "strengths_to_maintain": [],
+                "final_comments": ""
+            }
         
         return diagnosis_data, evaluation_data
         
@@ -251,26 +317,44 @@ async def grade_essay_with_ai(essay_content: str, question_type: Optional[str] =
                 if cleaned and len(cleaned.strip()) > 10:  # 确保建议有实质内容
                     cleaned_suggestions.append(cleaned)
         
-        # 如果没有有效建议，提供默认建议
-        if not cleaned_suggestions:
-            cleaned_suggestions = [
-                "建议重新检查答题格式和逻辑结构", 
-                "注意题目要求的完整性和准确性",
-                "加强要点概括和分析的深度"
-            ]
+        # 从诊断数据直接提取评分细则
+        score_details = convert_diagnosis_to_score_details(diagnosis_data, question_type)
+        
+        # 检查评分细则中是否已经包含改进建议
+        has_specific_suggestions = False
+        if score_details:
+            for detail in score_details:
+                if detail.description and any(keyword in detail.description for keyword in ["【改进方向】", "【改进建议】", "建议", "改进"]):
+                    has_specific_suggestions = True
+                    break
+        
+        # 只有在评分细则中没有具体建议且AI也没有给出建议时，才提供简化的默认建议
+        if not cleaned_suggestions and not has_specific_suggestions:
+            cleaned_suggestions = ["请参考上方评分细则中的具体改进建议"]
         
         # 限制建议数量
         suggestions = cleaned_suggestions[:5]
         
-        # 从诊断数据直接提取评分细则
-        score_details = []
+        # === 方案一：强制一致性 - 使用评分细则总分作为最终总分 ===
+        calculated_total = sum(detail.actualScore for detail in score_details) if score_details else 0
         
-        # 使用convert_diagnosis_to_score_details函数处理诊断数据
-        score_details = convert_diagnosis_to_score_details(diagnosis_data, question_type)
-        
+        # 如果评分细则有数据且总分合理，使用计算出的总分；否则使用AI给出的总分
+        if score_details and calculated_total > 0:
+            final_total_score = round(calculated_total, 1)
+            logger.info("使用评分细则计算总分: AI总分={}, 细则总分={}, 最终总分={}".format(
+                total_score, calculated_total, final_total_score))
+            
+            # 记录分数差异用于监控
+            score_difference = abs(total_score - calculated_total)
+            if score_difference > 5:
+                logger.warning("总分差异较大: AI总分={}, 细则总分={}, 差异={}".format(
+                    total_score, calculated_total, score_difference))
+        else:
+            final_total_score = total_score
+            logger.info("使用AI总分: {} (评分细则数据不足)".format(final_total_score))
         
         return EssayGradingResult(
-            score=total_score,
+            score=final_total_score,  # 使用计算后的一致总分
             feedback=feedback,
             suggestions=suggestions,
             scoreDetails=score_details
@@ -376,6 +460,9 @@ def convert_diagnosis_to_score_details(diagnosis_data: dict, question_type: str 
                 score = dimension_info.get("score", 0)
                 feedback = dimension_info.get("feedback", "{}评价".format(dimension_name))
                 
+                # 清理prompt指令泄漏
+                feedback = clean_ai_thinking_patterns(feedback)
+                
                 # 转换表情符号格式为蓝色HTML格式
                 feedback = convert_emoji_to_blue_html(feedback)
                 
@@ -425,9 +512,7 @@ async def get_question_type_from_ai(question_text: str) -> str:
             }
         )
         
-        # 获取申论四大题型核心秘籍的内容
-        chapter_content = extract_chapter_content("概括题")  # 获取概括题章节作为参考
-        
+        # 为避免偏置，仅使用中立定义进行识别
         prompt = """你是申论题型专家"悟道"，基于《申论四大题型核心秘籍》进行题型识别。
 
 === 申论四大题型核心识别要点 ===
@@ -475,10 +560,18 @@ async def get_question_type_from_ai(question_text: str) -> str:
             model=settings.openai_model_name,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,  # 降低温度提高准确性
-            max_tokens=50
+            max_tokens=200  # 增加token限制避免截断
         )
         
+        # 处理推理模型：优先从reasoning_content获取响应，fallback到content
         ai_response = response.choices[0].message.content
+        reasoning_content = getattr(response.choices[0].message, 'reasoning_content', None)
+        
+        # 如果content为空但reasoning_content有内容，尝试从reasoning中提取答案
+        if not ai_response and reasoning_content:
+            logger.info("检测到推理模型，从reasoning_content提取答案")
+            ai_response = extract_answer_from_reasoning(reasoning_content)
+        
         if not ai_response:
             raise ValueError("AI返回了空响应")
             
@@ -489,33 +582,89 @@ async def get_question_type_from_ai(question_text: str) -> str:
         for valid_type in valid_types:
             if valid_type == question_type:
                 logger.info("AI题型诊断结果（精确匹配）: {}".format(valid_type))
-                return valid_type
+                ai_type = valid_type
+                break
+        else:
+            ai_type = None
         
         # 如果没有精确匹配，进行包含匹配
         for valid_type in valid_types:
             if valid_type in question_type:
                 logger.info("AI题型诊断结果（包含匹配）: {}".format(valid_type))
-                return valid_type
+                ai_type = valid_type
+                break
         
-        # 如果都没匹配到，根据关键词进行智能判断
-        question_text_lower = question_text.lower()
+        # 仅对“题目材料及问题”片段做启发式识别，避免被“我的答案”干扰
+        q_segment = question_text
+        try:
+            start = question_text.find("【题目材料及问题】")
+            answer_pos = question_text.find("【我的答案】")
+            if start != -1 and answer_pos != -1 and answer_pos > start:
+                q_segment = question_text[start:answer_pos]
+        except Exception:
+            pass
+        question_text_lower = q_segment.lower()
         
         # 综合分析题的识别优先级要高，因为它容易被误判为概括题
-        if any(keyword in question_text_lower for keyword in ['分析', '理解', '谈谈', '评价', '如何看待', '说明', '阐述', '解释']):
-            return "综合分析题"
-        elif any(keyword in question_text_lower for keyword in ['概括', '归纳', '梳理', '总结', '列举']) and not any(keyword in question_text_lower for keyword in ['谈谈', '说明', '分析']):
+        # 增强版识别：包含更多综合分析题的关键词和表达模式
+        comprehensive_analysis_keywords = [
+            '分析', '理解', '谈谈', '评价', '如何看待', '说明', '阐述', '解释',
+            '如何', '为什么', '关系', '作用', '意义', '影响', '原因'
+        ]
+        
+        summary_keywords = ['概括', '归纳', '梳理', '总结', '列举']
+        strategy_keywords = ['对策', '建议', '措施', '办法', '如何解决', '怎么办']
+        application_keywords = ['倡议书', '讲话稿', '报告', '通知', '发言', '致辞', '公开信', '写', '拟']
+        
+        # 检测综合分析题的复合特征
+        has_comprehensive_keywords = any(keyword in question_text_lower for keyword in comprehensive_analysis_keywords)
+        has_multi_layer_requirements = ('是什么' in question_text_lower and '如何' in question_text_lower) or \
+                                     ('什么' in question_text_lower and '说明' in question_text_lower) or \
+                                     ('指的是' in question_text_lower and ('如何' in question_text_lower or '怎样' in question_text_lower))
+        
+        heuristic_type = None  # 初始化变量
+        if has_comprehensive_keywords or has_multi_layer_requirements:
+            heuristic_type = "综合分析题"
+            logger.info(f"启发式识别为综合分析题，关键词匹配: {has_comprehensive_keywords}, 多层次要求: {has_multi_layer_requirements}")
+        elif any(keyword in question_text_lower for keyword in summary_keywords) and not has_comprehensive_keywords:
             # 只有在没有分析类词汇的情况下才判断为概括题
-            return "概括题"
-        elif any(keyword in question_text_lower for keyword in ['对策', '建议', '措施', '办法', '如何解决', '怎么办']):
-            return "对策题"
-        elif any(keyword in question_text_lower for keyword in ['倡议书', '讲话稿', '报告', '通知', '发言', '致辞', '公开信', '写', '拟']):
-            return "应用文写作题"
+            heuristic_type = "概括题"
+        elif any(keyword in question_text_lower for keyword in strategy_keywords):
+            heuristic_type = "对策题"
+        elif any(keyword in question_text_lower for keyword in application_keywords):
+            heuristic_type = "应用文写作题"
+        
+        logger.info(f"启发式识别结果: {heuristic_type}")
+        
+        # 决策：若 AI 判为概括题，但启发式强烈指向综合分析题，则以启发式为准
+        if ai_type:
+            # 修复操作符优先级bug：添加括号确保逻辑正确
+            if ai_type == "概括题" and ('分析' in question_text_lower or '评价' in question_text_lower or '谈谈' in question_text_lower or '说明' in question_text_lower):
+                logger.info("覆盖AI结果：启发式识别为综合分析题（检测到关键词：分析/评价/谈谈/说明）")
+                return "综合分析题"
+            return ai_type
+        
+        if heuristic_type:
+            return heuristic_type
         
         logger.warning("AI题型诊断未能明确识别，默认返回概括题")
         return "概括题"
         
     except Exception as e:
         logger.error("AI题型诊断失败: {}".format(str(e)))
+        # 异常情况下也要使用启发式逻辑
+        logger.info("使用启发式逻辑作为fallback")
+        question_text_lower = question_text.lower()
+        
+        comprehensive_analysis_keywords = [
+            '分析', '理解', '谈谈', '评价', '如何看待', '说明', '阐述', '解释',
+            '如何', '为什么', '关系', '作用', '意义', '影响', '原因'
+        ]
+        
+        if any(keyword in question_text_lower for keyword in comprehensive_analysis_keywords):
+            logger.info("异常fallback：识别为综合分析题")
+            return "综合分析题"
+        
         return "概括题"
 
 

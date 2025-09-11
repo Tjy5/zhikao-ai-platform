@@ -368,11 +368,11 @@ def create_expert_grading_prompt(essay_content: str, question_type: str) -> str:
 
 {{
   "score": [0-100的数字，基于方法论符合度评分],
-  "feedback": "详细的专业批改意见，必须包含：\n\n**具体优点：**\n- 引用原文+专业点评\n\n**主要问题：**\n- 引用原文+问题诊断+改进方向\n\n**综合建议：**\n基于申论方法论的专业指导意见",
+  "feedback": "详细的专业批改意见，必须包含：\n\n**具体优点：**\n- 结合原文具体表述进行专业点评\n\n**主要问题：**\n- 结合原文具体表述进行问题诊断和改进方向指导\n\n**综合建议：**\n基于申论方法论的专业指导意见",
   "suggestions": ["基于方法论的具体改进建议1", "基于方法论的具体改进建议2", "基于方法论的具体改进建议3"]
 }}
 
-重要：所有分析必须引用用户的具体原文，并结合方法论要求进行专业点评。直接返回JSON，不要其他文字。"""
+重要：分析应尽量结合用户的具体表述，并基于方法论要求进行专业点评。直接返回JSON，不要其他文字。"""
 
     return prompt
 
@@ -420,7 +420,7 @@ Based on your evaluation, populate the JSON structure with:
 
 - task_diagnosis: Your determination and greeting
 - comprehensive_evaluation: Detailed narrative analysis that MUST include specific examples from the user's submission, including:
-  * 具体优点：指出2-3个学生做得好的具体地方，引用原文中的例子
+  * 具体优点：指出2-3个学生做得好的具体地方，结合原文中的具体表述
   * 主要问题：指出3-4个具体问题，每个问题都要有原文中的例子支撑
   * 方法论应用分析：分析学生在四个方法论步骤中的表现
   * 总体评价：给出整体评价和改进方向
@@ -526,23 +526,23 @@ def create_expert_diagnosis_prompt(essay_content: str, question_type: str) -> st
 🎯 **批改维度**（严格按四步法）：
 
 **【{steps['step1']}】** - 满分25分
-- ✅ 加分点：引用原文"XXXX"，说明为何加分
-- ❌ 扣分点：引用原文"XXXX"，说明为何扣分  
+- ✅ 加分点：结合学生具体表述分析，说明为何加分
+- ❌ 扣分点：结合学生具体表述分析，说明为何扣分  
 - 💡 改进建议：具体怎么修改
 
 **【{steps['step2']}】** - 满分30分  
-- ✅ 加分点：引用原文"XXXX"，说明为何加分
-- ❌ 扣分点：引用原文"XXXX"，说明为何扣分
+- ✅ 加分点：结合学生具体表述分析，说明为何加分
+- ❌ 扣分点：结合学生具体表述分析，说明为何扣分
 - 💡 改进建议：具体怎么修改
 
 **【{steps['step3']}】** - 满分25分
-- ✅ 加分点：引用原文"XXXX"，说明为何加分  
-- ❌ 扣分点：引用原文"XXXX"，说明为何扣分
+- ✅ 加分点：结合学生具体表述分析，说明为何加分  
+- ❌ 扣分点：结合学生具体表述分析，说明为何扣分
 - 💡 改进建议：具体怎么修改
 
 **【{steps['step4']}】** - 满分20分
-- ✅ 加分点：引用原文"XXXX"，说明为何加分
-- ❌ 扣分点：引用原文"XXXX"，说明为何扣分  
+- ✅ 加分点：结合学生具体表述分析，说明为何加分
+- ❌ 扣分点：结合学生具体表述分析，说明为何扣分  
 - 💡 改进建议：具体怎么修改
 
 === 输出要求 ===
@@ -555,10 +555,10 @@ def create_expert_diagnosis_prompt(essay_content: str, question_type: str) -> st
       "full_score": 25,
       "actual_score": [具体得分],
       "positive_points": [
-        "引用原文：'学生的具体原文' + 加分理由：为什么这里体现了{steps['step1']}的要求"
+"结合学生具体表述分析加分理由：为什么这里体现了{steps['step1']}的要求"
       ],
       "negative_points": [
-        "引用原文：'学生的具体原文' + 扣分理由：为什么这里违背了{steps['step1']}的要求" 
+"结合学生具体表述分析扣分理由：为什么这里违背了{steps['step1']}的要求" 
       ],
       "improvement_suggestion": "具体的改进建议，告诉学生如何修改"
     }},

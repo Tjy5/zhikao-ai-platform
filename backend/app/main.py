@@ -85,11 +85,12 @@ def get_cors_origins():
     
     return list(set(origins))  # Remove duplicates
 
-# Configure CORS middleware with dynamic origins
-cors_origins = get_cors_origins()
+# Configure CORS middleware
+# In development, allow localhost/127.0.0.1 on any port to avoid port sync issues
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=[],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],

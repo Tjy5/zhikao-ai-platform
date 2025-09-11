@@ -90,7 +90,7 @@ def create_expert_diagnosis_prompt(essay_content: str, question_type: str) -> st
         
         dimensions_json += '''    "{}": {{
       "score": {},
-      "feedback": "请严格按照申论四大题型核心秘籍的方法论，对该维度进行深度评价。格式要求：\\n\\n<span style='color: #1e40af; font-weight: bold;'>【得分点】</span>\\n• 引用原文：'学生的具体表述' - 说明为什么这体现了{}能力，符合哪项方法论要求\\n• 引用原文：'学生的具体表述' - 分析优秀之处和加分因素\\n\\n<span style='color: #1e40af; font-weight: bold;'>【扣分点】</span>\\n• 引用原文：'学生的具体表述' - 指出违背了哪项方法论要求，具体问题在哪里\\n• 引用原文：'学生的具体表述' - 分析失分原因和改进空间\\n\\n<span style='color: #1e40af; font-weight: bold;'>【改进方向】</span>\\n• 基于方法论要求，提供3-4条具体可操作的改进建议\\n• 给出改写示例：原文'...' → 建议改为'...'，说明改进理由\\n\\n要求：必须引用学生原文，结合申论核心方法论深度分析，字数150-200字"
+      "feedback": "<span style='color: #1e40af; font-weight: bold;'>【得分点】</span>\\n• 对学生表现出色的地方进行具体分析，如有具体表述可引用，格式为：'学生的具体表述' - 说明为什么这体现了{}能力\\n• 分析优秀之处和加分因素\\n\\n<span style='color: #1e40af; font-weight: bold;'>【扣分点】</span>\\n• 指出学生答题中的具体问题，如有问题表述可引用则引用\\n• 分析失分原因和改进空间\\n\\n<span style='color: #1e40af; font-weight: bold;'>【改进方向】</span>\\n• 提供3-4条具体可操作的改进建议\\n• 如需改写示例，格式为：原表述'...' → 建议改为'...'，说明改进理由\\n\\n要求：尽量引用学生具体表述进行分析，但应自然合理，不可强求。深度分析，字数150-200字"
     }},
 '''.format(dim_name, initial_score, dim_name)
     

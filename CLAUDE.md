@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an AI-powered public examination platform (智考公考伴侣) that provides intelligent essay grading for Chinese civil service exam preparation. The system consists of:
+This is an AI-powered public examination platform (智考公考伴侣) that provides intelligent essay grading for Chinese civil service exam preparation. The system features enhanced AI integration with reasoning model support, improved question type recognition, and intelligent content filtering for optimal user experience.
 
 - **Frontend**: Next.js 15 with React 19, TypeScript, and Tailwindcss v4
 - **Backend**: FastAPI with Python 3.10+, PostgreSQL, SQLAlchemy, and Alembic
+- **AI Integration**: Enhanced OpenAI integration with support for reasoning models and robust fallback mechanisms
 - **Architecture**: Microservices with containerized deployment using Docker
 
 ## Development Commands
@@ -25,6 +26,17 @@ This is an AI-powered public examination platform (智考公考伴侣) that prov
 # - Displays actual service URLs
 # - Safe shutdown with Ctrl+C
 # - Won't interfere with other applications
+
+# Fixed Port Development (with reuse functionality)
+.\run-dev-rare-ports.ps1
+
+# Features:
+# - Fixed rare ports (backend: 65123, frontend: 65124) to avoid conflicts
+# - Automatic reuse of existing services if ports are occupied
+# - No "port already in use" errors - intelligently reuses running instances
+# - Writes port files for other tools to read
+# - Custom port support: -BackendPort 8004 -FrontendPort 3000
+# - Skip database: -NoDB
 ```
 
 #### Development Management Scripts
@@ -96,10 +108,9 @@ docker-compose up            # Start all services
 - `app/schemas/` - Pydantic models for request/response validation
 - `app/models/` - SQLAlchemy database models
 - `app/services/` - Business logic and AI service integration
-  - `ai_service.py` - OpenAI integration for essay grading
-  - `prompt_service.py` - Prompt template management
-  - `desc_enrich.py` - Description enrichment service
-  - `desc_compose.py` - Description composition service
+  - `ai_service.py` - Enhanced OpenAI integration with reasoning model support, improved question type recognition, and intelligent content filtering
+  - `prompt_service.py` - Prompt template management with essay grading manual
+  - `prompt_service_simple.py` - Simplified prompt service for question type dimensions with clean output
 - `app/db/` - Database configuration and connection management
 - `app/core/` - Core configuration and utilities
 - `alembic/` - Database migration files
@@ -107,10 +118,12 @@ docker-compose up            # Start all services
 
 ### Frontend Structure
 - `src/app/` - Next.js App Router pages and layouts
-- `src/app/page.tsx` - Main essay grading interface
+- `src/app/page.tsx` - Main essay grading interface with progress tracking
+- `src/config/api.ts` - Dynamic API configuration (auto-generated)
+- `start-server.js` - Custom server launcher with port detection
 - Uses client-side form handling for essay submission
-- Integrates with backend API at `http://localhost:8001/api/v1/`
-- Runs on `http://localhost:3000` in development
+- Dynamically integrates with backend API (reads from `backend_port.txt`)
+- Runs on dynamic ports starting from 3000 in development
 
 ### Development Environment
 - **Frontend**: Next.js dev server with dynamic port allocation (starts from port 3000)
@@ -121,6 +134,7 @@ docker-compose up            # Start all services
   - Port information saved to `backend_port.txt` and `frontend_port.txt`
   - Scripts read actual ports from these files for accurate operations
 - **One-click setup**: `dev-fullstack.ps1` handles complete environment setup
+- **Fixed Port Development**: `run-dev-rare-ports.ps1` uses rare ports (65123/65124) with intelligent reuse
 
 ### Key Features
 - **Essay Grading**: AI-powered analysis of Chinese civil service exam essays
@@ -128,20 +142,65 @@ docker-compose up            # Start all services
 - **Real-time Feedback**: Provides scoring, detailed feedback, and improvement suggestions
 - **Responsive UI**: Modern interface built with Tailwind CSS
 
+### Recent Enhancements (Latest Update)
+
+#### AI Service Improvements
+- **Reasoning Model Support**: Enhanced `ai_service.py` to handle reasoning models (e.g., `openai/gpt-oss-120b`) that store responses in `reasoning_content` field
+- **Question Type Recognition**: Fixed operator precedence bug and improved heuristic logic for accurate question type identification
+- **Content Filtering**: Implemented intelligent prompt instruction filtering to ensure clean, user-friendly interface without internal AI prompts
+- **Fallback Mechanisms**: Added robust error handling with heuristic fallbacks when AI services fail
+
+#### User Experience Enhancements  
+- **Clean Interface**: Automatic removal of AI internal instructions like "作为资深申论阅卷专家'悟道'" from user-facing content
+- **Smart Suggestions**: Optimized improvement suggestions logic to avoid generic recommendations when specific feedback is available
+- **Consistent Scoring**: Improved score consistency between overall score and detailed scoring rubrics
+- **Error Resilience**: Enhanced service stability with better 403 error handling and service recovery
+
+#### Technical Improvements
+- **Token Management**: Increased token limits from 50 to 200 to prevent response truncation  
+- **Response Parsing**: Added `extract_answer_from_reasoning()` function for parsing reasoning model outputs
+- **Content Cleaning**: Enhanced `clean_ai_thinking_patterns()` with multiple prompt leakage detection patterns
+- **Exception Handling**: Improved fallback logic in exception scenarios to maintain service availability
+
 ### API Endpoints
-- `POST /api/v1/essays/grade` - Submit essay for AI grading
-- `GET /api/v1/essays/ai-status` - Check AI service status
+- `POST /api/v1/essays/grade` - Submit essay for AI grading (traditional single response)
+- `POST /api/v1/essays/grade-progressive` - Submit essay for progressive AI grading (streaming response)
+- `GET /api/v1/essays/ai-status` - Check AI service status and configuration
 - `GET /health` - Health check endpoint
+- `GET /` - Root endpoint with service status
+- `POST /reload-config` - Reload configuration (development only)
 
 ## Development Notes
 
-- Backend uses automatic API documentation via FastAPI (available at `http://localhost:8001/docs`)
-- Frontend uses Next.js App Router with TypeScript
+- Backend uses automatic API documentation via FastAPI (available at `http://localhost:<backend_port>/docs`)
+- Frontend uses Next.js App Router with TypeScript and Tailwind CSS v4
 - Database migrations managed through Alembic
-- AI essay grading service integrates with OpenAI API
-- CORS is configured to allow all origins for development
-- Global exception handling provides detailed error information
+- AI essay grading service integrates with OpenAI API using dual-stage diagnosis
+- CORS is configured to dynamically allow frontend origins based on port files
+- Global exception handling provides detailed error information in Chinese
 - Project includes Chinese documentation in markdown files
+- Frontend uses custom `start-server.js` for dynamic port allocation
+- Backend supports both traditional and progressive (streaming) essay grading
+
+### AI Service Implementation Details
+
+#### Question Type Recognition (`ai_service.py`)
+- **Dual Recognition**: Combines AI-based recognition with heuristic fallback for reliability
+- **Operator Precedence Fix**: Corrected logic bug that caused comprehensive analysis questions to be misidentified as summary questions
+- **Enhanced Keywords**: Expanded keyword detection for comprehensive analysis questions (分析, 理解, 谈谈, 评价, 说明, 如何, 为什么, 关系, 作用, 意义, 影响, 原因)
+- **Multi-layer Requirements**: Detects complex question patterns requiring both explanation and analysis
+
+#### Reasoning Model Support
+- **Content Field Handling**: Processes both `content` and `reasoning_content` response fields
+- **Token Management**: Increased limits to accommodate reasoning model response patterns
+- **Answer Extraction**: Implements `extract_answer_from_reasoning()` for parsing reasoning model outputs
+- **Fallback Logic**: Graceful degradation when reasoning models return empty content fields
+
+#### Content Filtering System
+- **Prompt Leakage Prevention**: Removes internal AI instructions from user-facing content using regex patterns
+- **Multiple Pattern Detection**: Handles various forms of prompt instruction leakage
+- **User-friendly Output**: Ensures clean, professional interface without exposing AI internal prompts
+- **Suggestion Optimization**: Replaces generic suggestions with specific, actionable feedback when available
 
 ### Development Workflow
 
@@ -152,6 +211,14 @@ docker-compose up            # Start all services
    - Finds free ports if defaults are occupied
    - Displays actual service URLs when ready
    - Monitors service health continuously
+
+2. **Fixed Port Development**: Run `.\run-dev-rare-ports.ps1`
+   - Uses rare ports (backend: 65123, frontend: 65124) to avoid conflicts
+   - Intelligently reuses existing services if ports are occupied
+   - No "port already in use" errors - automatically detects and reuses running instances
+   - Custom port support: `-BackendPort 8004 -FrontendPort 3000`
+   - Skip database: `-NoDB`
+   - Perfect for multiple development sessions without port conflicts
 
 #### Alternative: Individual Service Management  
 1. **Backend**: Use `.\dev.ps1` in `backend/` directory for complete auto-setup
@@ -180,7 +247,8 @@ docker-compose up            # Start all services
 ### Utility Tools
 - `tools/safe_cleanup.py` - Safely move unwanted files to .trash folder based on cleanup_candidates.txt
 - `tools/restore_from_trash.py` - Restore files from .trash folder  
-- Backend generates log files: `backend.log`, `backend_new.log`
+- Backend generates log files: `backend.log`, `backend_debug.log`, `backend_final.log`, etc.
+- `quick-restart.bat` - Quick service management (start/stop/restart/status)
 
 ### 🔧 Development Scripts Features
 
@@ -190,6 +258,15 @@ docker-compose up            # Start all services
 - **Health Monitoring**: Continuous service status monitoring
 - **Clean Shutdown**: Proper cleanup when stopped with Ctrl+C
 - **Informative Output**: Shows actual service URLs and status
+
+#### `run-dev-rare-ports.ps1` - Fixed Port Development with Reuse
+- **Rare Ports**: Uses uncommon ports (65123/65124) to avoid conflicts with other applications
+- **Intelligent Reuse**: Automatically detects and reuses existing services if ports are occupied
+- **No Port Conflicts**: Never shows "port already in use" errors - intelligently reuses running instances
+- **Custom Ports**: Support for `-BackendPort` and `-FrontendPort` parameters
+- **Database Control**: `-NoDB` flag to skip PostgreSQL startup
+- **Port File Management**: Writes `backend_port.txt` and `frontend_port.txt` for other tools
+- **Perfect for Multiple Sessions**: Ideal when running multiple development environments simultaneously
 
 #### `quick-restart.bat` - Quick Operations
 - **Precise Termination**: Only stops development servers (port-based targeting)

@@ -21,7 +21,7 @@ class Settings:
             'OPENAI_API_BASE': os.getenv("OPENAI_API_BASE", "https://api.kkyyxx.xyz/v1"),
             'OPENAI_MODEL_NAME': os.getenv("OPENAI_MODEL_NAME", "openai/gpt-oss-120b"),
             'DATABASE_URL': os.getenv("DATABASE_URL", ""),
-            'DEBUG': os.getenv("DEBUG", "True").lower() == "true"
+            'DEBUG': os.getenv("DEBUG", "False").lower() == "true"
         }
     
     @property

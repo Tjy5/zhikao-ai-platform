@@ -9,6 +9,7 @@ from app.services.ai_service import (
     clean_unicode_text,
     convert_diagnosis_to_score_details,
 )
+from app.core.config import settings
 import logging
 import json
 import asyncio
@@ -247,7 +248,31 @@ async def grade_essay(submission: EssaySubmission):
             raise HTTPException(status_code=429, detail="请求过多，请稍后再试")
         if "model_not_found" in err:
             raise HTTPException(status_code=503, detail="AI 模型不可用，请联系管理员")
-        raise HTTPException(status_code=500, detail=f"服务异常，请稍后再试")
+        # 开发环境：返回结构化的兜底结果，避免前端 500 阻塞调试
+        if settings.DEBUG:
+            fallback_score = 75.0
+            response_data = {
+                "score": fallback_score,
+                "feedback": f"[DEBUG 模式兜底]\n系统处理时发生异常：{type(e).__name__}: {str(e)[:300]}",
+                "suggestions": [
+                    "请精简输入内容后重试",
+                    "稍后再次提交，或更换模型",
+                    "若持续失败，请查看后端日志"
+                ],
+                "scoreDetails": [
+                    {
+                        "item": "综合评价",
+                        "fullScore": 100.0,
+                        "actualScore": fallback_score,
+                        "description": "AI服务出现异常，已返回调试用的默认评分结果。"
+                    }
+                ],
+                "questionType": question_type,
+                "questionTypeSource": question_type_source,
+            }
+            return response_data
+        # 生产环境：保持 500
+        raise HTTPException(status_code=500, detail="服务异常，请稍后再试")
 
 
 @router.get("/essays/ai-status")
