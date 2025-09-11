@@ -20,6 +20,7 @@ from .prompt_service_simple import (
     create_overall_evaluation_prompt,
     get_question_type_dimensions
 )
+from .prompt_service import extract_chapter_content
 
 logger = logging.getLogger(__name__)
 
@@ -414,7 +415,7 @@ def convert_diagnosis_to_score_details(diagnosis_data: dict, question_type: str 
 
 
 async def get_question_type_from_ai(question_text: str) -> str:
-    """AI题型诊断服务"""
+    """AI题型诊断服务 - 增强版本，基于申论四大题型核心秘籍"""
     try:
         client = AsyncOpenAI(
             api_key=settings.openai_api_key,
@@ -424,23 +425,56 @@ async def get_question_type_from_ai(question_text: str) -> str:
             }
         )
         
-        prompt = """你是申论题型专家。请分析以下内容，仅返回题型名称。
+        # 获取申论四大题型核心秘籍的内容
+        chapter_content = extract_chapter_content("概括题")  # 获取概括题章节作为参考
+        
+        prompt = """你是申论题型专家"悟道"，基于《申论四大题型核心秘籍》进行题型识别。
 
-题目内容：
+=== 申论四大题型核心识别要点 ===
+1. **概括题**：要求"概括"、"归纳"、"梳理"某些要点、做法、原因、变化等
+   - 关键词：概括、归纳、梳理、总结、列举
+   - 特征：信息降维与逻辑重建
+   - 注意：题目通常只要求列出要点，不要求深入分析关系
+   
+2. **综合分析题**：要求"分析"、"谈谈理解"、"评价"、"说明"某个观点、现象、词语
+   - 关键词：分析、理解、谈谈、评价、如何看待、说明、阐述、解释
+   - 特征：解构与重构的逻辑思辨
+   - 注意：题目往往要求不仅说明"是什么"，还要分析"为什么"、"如何"等深层关系
+   
+3. **对策题**：要求提出"对策"、"建议"、"措施"、"怎么办"
+   - 关键词：对策、建议、措施、办法、如何解决
+   - 特征：对症下药的精准施策
+   
+4. **应用文写作题**：要求写"倡议书"、"讲话稿"、"报告"、"通知"等格式化文体
+   - 关键词：写、拟、起草 + 具体文种名称
+   - 特征：带着镣铐的场景之舞
+
+=== 待识别内容 ===
 {}
 
-请从以下四个选项中选择一个：
+=== 识别要求 ===
+请严格按照申论四大题型核心秘籍的标准，分析上述内容的题型特征：
+
+1. **关键动词识别**：重点关注"谈谈"、"说明"、"分析"等词汇（这些通常是综合分析题）
+2. **任务层次分析**：
+   - 如果只要求列出要点 → 概括题
+   - 如果要求解释含义+分析关系 → 综合分析题
+   - 如果要求提出解决方案 → 对策题
+   - 如果要求写特定格式文档 → 应用文写作题
+3. **特别注意**：题目中同时出现"是什么"+"如何"+"为什么"等多层次要求时，通常是综合分析题
+
+请只返回以下四个选项中的一个：
 - 概括题
 - 综合分析题  
 - 对策题
 - 应用文写作题
 
-只返回题型名称，不要其他内容：""".format(question_text)
+判断结果：""".format(question_text)
 
         response = await client.chat.completions.create(
             model=settings.openai_model_name,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
+            temperature=0.1,  # 降低温度提高准确性
             max_tokens=50
         )
         
@@ -451,11 +485,33 @@ async def get_question_type_from_ai(question_text: str) -> str:
         question_type = ai_response.strip()
         valid_types = ["概括题", "综合分析题", "对策题", "应用文写作题"]
         
+        # 优先精确匹配
         for valid_type in valid_types:
-            if valid_type in question_type:
-                logger.info("AI题型诊断结果: {}".format(valid_type))
+            if valid_type == question_type:
+                logger.info("AI题型诊断结果（精确匹配）: {}".format(valid_type))
                 return valid_type
         
+        # 如果没有精确匹配，进行包含匹配
+        for valid_type in valid_types:
+            if valid_type in question_type:
+                logger.info("AI题型诊断结果（包含匹配）: {}".format(valid_type))
+                return valid_type
+        
+        # 如果都没匹配到，根据关键词进行智能判断
+        question_text_lower = question_text.lower()
+        
+        # 综合分析题的识别优先级要高，因为它容易被误判为概括题
+        if any(keyword in question_text_lower for keyword in ['分析', '理解', '谈谈', '评价', '如何看待', '说明', '阐述', '解释']):
+            return "综合分析题"
+        elif any(keyword in question_text_lower for keyword in ['概括', '归纳', '梳理', '总结', '列举']) and not any(keyword in question_text_lower for keyword in ['谈谈', '说明', '分析']):
+            # 只有在没有分析类词汇的情况下才判断为概括题
+            return "概括题"
+        elif any(keyword in question_text_lower for keyword in ['对策', '建议', '措施', '办法', '如何解决', '怎么办']):
+            return "对策题"
+        elif any(keyword in question_text_lower for keyword in ['倡议书', '讲话稿', '报告', '通知', '发言', '致辞', '公开信', '写', '拟']):
+            return "应用文写作题"
+        
+        logger.warning("AI题型诊断未能明确识别，默认返回概括题")
         return "概括题"
         
     except Exception as e:

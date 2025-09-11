@@ -373,38 +373,14 @@ export default function Home() {
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-700">
                                   <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
-                                    <ReactMarkdown 
-                                      remarkPlugins={[remarkGfm]}
-                                      components={{
-                                        // 自定义markdown组件，突出显示关键信息
-                                        p: ({children}) => (
-                                          <p className="mb-2 last:mb-0">{children}</p>
-                                        ),
-                                        strong: ({children}) => (
-                                          <strong className="font-semibold text-gray-900">{children}</strong>
-                                        ),
-                                        // 为特殊标记添加样式
-                                        text: ({children}) => {
-                                          if (typeof children === 'string') {
-                                            if (children.includes('✅')) {
-                                              return <span className="text-green-700 font-medium">{children}</span>;
-                                            }
-                                            if (children.includes('⚠️')) {
-                                              return <span className="text-yellow-700 font-medium">{children}</span>;
-                                            }
-                                            if (children.includes('❌')) {
-                                              return <span className="text-red-700 font-medium">{children}</span>;
-                                            }
-                                            if (children.includes('💡')) {
-                                              return <span className="text-blue-700 font-medium">{children}</span>;
-                                            }
-                                          }
-                                          return <>{children}</>;
-                                        }
+                                    <div 
+                                      className="ai-feedback-content"
+                                      dangerouslySetInnerHTML={{ 
+                                        __html: detail.description
+                                          .replace(/\n/g, '<br/>')
+                                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                                       }}
-                                    >
-                                      {detail.description}
-                                    </ReactMarkdown>
+                                    />
                                   </div>
                                 </td>
                               </tr>
@@ -442,11 +418,16 @@ export default function Home() {
                     详细反馈
                   </h3>
                   <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                  <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {gradingResult.feedback}
-                  </ReactMarkdown>
-                  </div>
+                    <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
+                      <div 
+                        className="ai-feedback-content"
+                        dangerouslySetInnerHTML={{ 
+                          __html: gradingResult.feedback
+                            .replace(/\n/g, '<br/>')
+                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               )}

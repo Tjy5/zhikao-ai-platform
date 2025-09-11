@@ -80,3 +80,55 @@ body {
 .prose h4:first-child {
   margin-top: 0;
 }
+
+/* AI生成内容的样式 - 支持蓝色突出显示 */
+.ai-feedback-content {
+  line-height: 1.7;
+  font-size: 0.875rem;
+}
+
+.ai-feedback-content p {
+  margin: 0.75em 0;
+}
+
+.ai-feedback-content p:first-child {
+  margin-top: 0;
+}
+
+.ai-feedback-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 确保AI生成的蓝色突出显示正确渲染 */
+.ai-feedback-content span[style*="color: #1e40af"] {
+  color: #1e40af !important;
+  font-weight: bold !important;
+  display: inline-block;
+  margin: 0.5em 0;
+  padding: 0.2em 0;
+}
+
+/* 支持项目列表样式 */
+.ai-feedback-content ul {
+  list-style-type: disc;
+  margin-left: 1.5em;
+  margin: 1em 0;
+}
+
+.ai-feedback-content li {
+  margin: 0.5em 0;
+  line-height: 1.6;
+}
+
+/* 强调文本样式 */
+.ai-feedback-content strong {
+  color: #374151;
+  font-weight: 600;
+}
+
+/* 段落间距优化 */
+.ai-feedback-content br + br {
+  display: block;
+  margin: 1em 0;
+  content: "";
+}
