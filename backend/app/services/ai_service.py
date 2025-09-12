@@ -76,6 +76,57 @@ def convert_emoji_to_blue_html(text: str) -> str:
     return text
 
 
+def extract_meaningful_evaluation_from_raw_content(content: str) -> str:
+    """从AI原始响应中智能提取评价内容，专门用于整体评价"""
+    if not content:
+        return ""
+    
+    # 先尝试从可能的JSON中提取
+    try:
+        # 简单的JSON提取尝试
+        if '"overall_evaluation"' in content:
+            start = content.find('"overall_evaluation"') + len('"overall_evaluation"')
+            # 找到后面的值
+            colon_pos = content.find(':', start)
+            if colon_pos != -1:
+                # 从冒号后开始找值
+                value_start = colon_pos + 1
+                # 找到引号开始
+                quote_start = content.find('"', value_start)
+                if quote_start != -1:
+                    quote_end = content.find('"', quote_start + 1)
+                    while quote_end != -1 and content[quote_end - 1] == '\\':
+                        quote_end = content.find('"', quote_end + 1)
+                    if quote_end != -1:
+                        evaluation_text = content[quote_start + 1:quote_end]
+                        if evaluation_text and len(evaluation_text) > 20:
+                            return evaluation_text.replace('\\n', '\n').strip()
+    except Exception:
+        pass
+    
+    # 如果JSON提取失败，尝试提取明显的评价句子
+    sentences = re.split(r'[。！？\.]', content)
+    evaluation_sentences = []
+    
+    for sentence in sentences:
+        sentence = sentence.strip()
+        # 寻找包含评价关键词的句子
+        if (len(sentence) > 15 and
+            any(keyword in sentence for keyword in ['答案', '表现', '水平', '能力', '基础', '整体', '分析', '评价']) and
+            not sentence.startswith('{') and
+            not sentence.startswith('"') and
+            '解析失败' not in sentence):
+            evaluation_sentences.append(sentence)
+            if len(evaluation_sentences) >= 2:
+                break
+    
+    if evaluation_sentences:
+        result = '。'.join(evaluation_sentences) + '。'
+        return result[:500]  # 限制长度
+    
+    return ""
+
+
 def extract_answer_from_reasoning(reasoning_content: str) -> str:
     """从推理模型的reasoning_content中提取题型答案"""
     if not reasoning_content:
@@ -234,11 +285,13 @@ async def grade_essay_with_expert_diagnosis(essay_content: str, question_type: O
         # 解析第二阶段结果（容错）
         try:
             evaluation_data = parse_ai_json_response(evaluation_content, "评价阶段", question_type or "概括题")
+            logger.info("评价阶段JSON解析成功，overall_evaluation: {}".format(
+                str(evaluation_data.get("overall_evaluation", ""))[:100]))
         except Exception as parse_err2:
             logger.warning("评价阶段JSON解析失败，使用回退方案: {}".format(str(parse_err2)[:200]))
             evaluation_data = {
                 "total_score": 75.0,
-                "overall_evaluation": clean_ai_thinking_patterns(evaluation_content)[:1000] or "AI批改完成",
+                "overall_evaluation": extract_meaningful_evaluation_from_raw_content(evaluation_content) or "AI专家已完成综合评估，请参考详细的专业诊断意见",
                 "priority_suggestions": [],
                 "strengths_to_maintain": [],
                 "final_comments": ""
@@ -270,9 +323,23 @@ async def grade_essay_with_ai(essay_content: str, question_type: Optional[str] =
         except (ValueError, TypeError):
             total_score = 75.0
         
-        # 获取并清理整体评价
+        # 获取整体评价 - 特殊处理，避免误杀正常内容
         overall_evaluation = evaluation_data.get("overall_evaluation", "AI批改完成")
-        overall_evaluation = clean_ai_thinking_patterns(overall_evaluation)
+        logger.info("原始overall_evaluation: {}".format(str(overall_evaluation)[:150]))
+        
+        # 如果是从JSON正确解析出来的评价内容，不要过度清理
+        if overall_evaluation and overall_evaluation != "AI批改完成":
+            # 只清理明显的错误模式，保留正常的评价内容
+            if any(error_pattern in overall_evaluation for error_pattern in ["解析失败", "JSON解析错误", "parse error"]):
+                overall_evaluation = "AI专家已完成综合评估，具体分析请参考专业诊断意见"
+                logger.info("检测到错误模式，使用默认评价")
+            else:
+                logger.info("保留原始评价内容")
+            # 其他情况保留原始评价内容
+        else:
+            # 使用更有意义的默认评价
+            overall_evaluation = "AI专家已完成综合评估，具体分析请参考专业诊断意见"
+            logger.info("使用默认评价，原因：overall_evaluation为空或为默认值")
         
         # 获取并清理专业诊断意见
         teacher_comments = diagnosis_data.get("teacher_comments", "")

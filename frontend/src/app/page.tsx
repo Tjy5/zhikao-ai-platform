@@ -33,6 +33,7 @@ export default function Home() {
   const [gradingResult, setGradingResult] = useState<GradingResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
+  const [statusText, setStatusText] = useState<string>("");
   const progressTimerRef = useRef<NodeJS.Timer | null>(null);
 
   const startProgress = () => {
@@ -55,6 +56,251 @@ export default function Home() {
       progressTimerRef.current = null;
     }
     setProgress(100);
+  };
+
+  // Hide internal prompt phrases from user-facing text
+  const sanitizeText = (text: string) => {
+    if (!text) return text;
+    try {
+      let t = text;
+      const patterns: RegExp[] = [
+        /作为资深申论阅卷专家["'“”]?悟道["'“”]?的.*?[：:]\s*/g,
+        /作为.*?阅卷专家.*?的.*?[：:]\s*/g,
+        /悟道.*?专业.*?[：:]\s*/g,
+        /深度专业诊断[：:]\s*/g,
+      ];
+      for (const p of patterns) t = t.replace(p, "");
+      return t.trimStart();
+    } catch {
+      return text;
+    }
+  };
+
+  // Stream-first submit for better UX (partial results + live progress)
+  const handleSubmitStream = async () => {
+    if (!questionMaterial.trim()) {
+      alert("请先填写题目材料或题干");
+      return;
+    }
+    if (!myAnswer.trim()) {
+      alert("请先填写你的作答");
+      return;
+    }
+
+    setIsLoading(true);
+    setStatusText("初始化...");
+    startProgress();
+
+    const combinedContent = `【题目材料与题干】\n${questionMaterial}\n\n【我的作答】\n${myAnswer}`;
+    const apiUrl = getApiUrl();
+
+    // Try progressive SSE over POST (fetch streaming)
+    try {
+      setStatusText("诊断中（阶段一）...");
+      const res = await fetch(`${apiUrl}/api/v1/essays/grade-progressive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+        body: JSON.stringify({ content: combinedContent }),
+      });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      // Stop local timer and use server-provided progress
+      stopProgress();
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+
+      const toNumber = (v: unknown, def = 0) => {
+        const n = typeof v === "number" ? v : parseFloat(String(v));
+        return Number.isFinite(n) ? n : def;
+      };
+      const normalizeDetails = (details: unknown): ScoreDetail[] | undefined => {
+        if (!details) return undefined;
+        const detailsRecord = details as Record<string, unknown>;
+        const arr = Array.isArray(details)
+          ? (details as unknown[])
+          : Array.isArray((detailsRecord as any)?.data)
+          ? ((detailsRecord as any).data as unknown[])
+          : Array.isArray((detailsRecord as any)?.items)
+          ? ((detailsRecord as any).items as unknown[])
+          : Array.isArray((detailsRecord as any)?.scoreDetails)
+          ? ((detailsRecord as any).scoreDetails as unknown[])
+          : Array.isArray((detailsRecord as any)?.score_details)
+          ? ((detailsRecord as any).score_details as unknown[])
+          : undefined;
+        if (!arr) return undefined;
+        const mapped = arr
+          .map((d: unknown) => {
+            const detail = d as Record<string, unknown>;
+            return {
+              item: String(detail?.item ?? detail?.name ?? detail?.title ?? ""),
+              fullScore: toNumber(
+                (detail?.fullScore as any) ?? (detail?.full_score as any) ?? (detail?.full as any) ?? (detail?.max as any) ?? 100,
+                100
+              ),
+              actualScore: toNumber(
+                (detail?.actualScore as any) ?? (detail?.actual_score as any) ?? (detail?.score as any) ?? (detail?.value as any) ?? 0,
+                0
+              ),
+              description: String((detail as any)?.description ?? (detail as any)?.desc ?? (detail as any)?.detail ?? ""),
+            } as ScoreDetail;
+          })
+          .filter((d: ScoreDetail) => d.item !== "");
+        return mapped.length ? mapped : undefined;
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data:")) continue;
+          const jsonStr = line.slice(5).trim();
+          if (!jsonStr) continue;
+          try {
+            const evt = JSON.parse(jsonStr) as Record<string, unknown>;
+            const stage = (evt as any)?.stage;
+            const qType = (evt as any)?.questionType as string | undefined;
+            const qSrc = (evt as any)?.questionTypeSource as string | undefined;
+
+            if (stage === 1) {
+              setProgress(toNumber((evt as any)?.progress, 50));
+              setStatusText("已完成诊断，生成维度细则...");
+              setGradingResult({
+                score: 0,
+                feedback: String((evt as any)?.teacherComments ?? ""),
+                suggestions: [],
+                scoreDetails: normalizeDetails((evt as any)?.scoreDetails),
+                questionType: qType,
+                questionTypeSource: qSrc,
+              });
+            } else if (stage === 2) {
+              setProgress(100);
+              setStatusText("完成评估");
+              const details = normalizeDetails((evt as any)?.scoreDetails) ?? undefined;
+              setGradingResult((prev) => ({
+                score: toNumber((evt as any)?.score, 0),
+                feedback: sanitizeText(String((evt as any)?.feedback ?? "")),
+                suggestions: Array.isArray((evt as any)?.suggestions)
+                  ? ((evt as any)?.suggestions as unknown[]).map((s) => sanitizeText(String(s)))
+                  : [],
+                scoreDetails: details
+                  ? details.map(d => ({ ...d, description: sanitizeText(d.description) }))
+                  : prev?.scoreDetails?.map(d => ({ ...d, description: sanitizeText(d.description) })),
+                questionType: qType ?? prev?.questionType,
+                questionTypeSource: qSrc ?? prev?.questionTypeSource,
+              } as GradingResult));
+            } else if (stage === "error") {
+              throw new Error(String((evt as any)?.message ?? "评分失败"));
+            }
+          } catch (err) {
+            console.warn("SSE chunk parse failed", err);
+          }
+        }
+      }
+
+      setIsLoading(false);
+      return;
+    } catch (streamErr) {
+      console.warn("Streaming failed, fallback to one-shot:", streamErr);
+    }
+
+    // Fallback: one-shot grading
+    try {
+      setStatusText("生成总体评估...");
+      const response = await fetch(`${apiUrl}/api/v1/essays/grade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: combinedContent }),
+      });
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(`HTTP error! status: ${response.status} ${errorText}`);
+      }
+      const raw: unknown = await response.json();
+      const rawRecord = raw as Record<string, unknown>;
+      const toNumber = (v: unknown, def = 0) => {
+        const n = typeof v === "number" ? v : parseFloat(String(v));
+        return Number.isFinite(n) ? n : def;
+      };
+      const normalizeDetails = (details: unknown): ScoreDetail[] | undefined => {
+        if (!details) return undefined;
+        const detailsRecord = details as Record<string, unknown>;
+        const arr = Array.isArray(details)
+          ? (details as unknown[])
+          : Array.isArray((detailsRecord as any)?.data)
+          ? ((detailsRecord as any).data as unknown[])
+          : Array.isArray((detailsRecord as any)?.items)
+          ? ((detailsRecord as any).items as unknown[])
+          : Array.isArray((detailsRecord as any)?.scoreDetails)
+          ? ((detailsRecord as any).scoreDetails as unknown[])
+          : Array.isArray((detailsRecord as any)?.score_details)
+          ? ((detailsRecord as any).score_details as unknown[])
+          : undefined;
+        if (!arr) return undefined;
+        const mapped = arr
+          .map((d: unknown) => {
+            const detail = d as Record<string, unknown>;
+            return {
+              item: String(detail?.item ?? detail?.name ?? detail?.title ?? ""),
+              fullScore: toNumber(
+                (detail?.fullScore as any) ?? (detail?.full_score as any) ?? (detail?.full as any) ?? (detail?.max as any) ?? 100,
+                100
+              ),
+              actualScore: toNumber(
+                (detail?.actualScore as any) ?? (detail?.actual_score as any) ?? (detail?.score as any) ?? (detail?.value as any) ?? 0,
+                0
+              ),
+              description: String((detail as any)?.description ?? (detail as any)?.desc ?? (detail as any)?.detail ?? ""),
+            } as ScoreDetail;
+          })
+          .filter((d: ScoreDetail) => d.item !== "");
+        return mapped.length ? mapped : undefined;
+      };
+
+      const normalized: GradingResult = {
+        score: toNumber(rawRecord?.score, 0),
+        feedback: sanitizeText(
+          typeof rawRecord?.feedback === "string" ? rawRecord.feedback : String(rawRecord?.feedback ?? "")
+        ),
+        suggestions: Array.isArray(rawRecord?.suggestions)
+          ? (rawRecord.suggestions as unknown[]).map((s: unknown) => sanitizeText(String(s)))
+          : rawRecord?.suggestions
+          ? [sanitizeText(String(rawRecord.suggestions))]
+          : [],
+        scoreDetails: (normalizeDetails(rawRecord?.scoreDetails) ?? normalizeDetails(rawRecord?.score_details))?.map(d => ({
+          ...d,
+          description: sanitizeText(d.description),
+        })),
+        questionType: typeof rawRecord?.questionType === "string" ? rawRecord.questionType : undefined,
+        questionTypeSource: typeof rawRecord?.questionTypeSource === "string" ? rawRecord.questionTypeSource : undefined,
+      };
+      if (!normalized.scoreDetails || normalized.scoreDetails.length === 0) {
+        normalized.scoreDetails = [
+          { item: "综合得分", fullScore: 100, actualScore: toNumber(normalized.score, 0), description: "系统未返回细则，按总分展示" },
+        ];
+      }
+      setGradingResult(normalized);
+      setStatusText("完成评估");
+      finishProgress();
+    } catch (error) {
+      console.error("评分失败:", error);
+      alert("评分失败：请检查网络或稍后重试");
+    } finally {
+      stopProgress();
+      setIsLoading(false);
+    }
+  };
+
+  // Stop progress without forcing completion
+  const stopProgress = () => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current as unknown as number);
+      progressTimerRef.current = null;
+    }
   };
 
   // Display normalization: scale "fullScore" so that totals sum to 100
@@ -190,6 +436,19 @@ export default function Home() {
         </div>
 
         {/* 主要内容区域 */}
+        {/* 顶部操作区 */}
+        <div className="mb-6 flex items-center justify-end">
+          <a
+            href="/history"
+            className="inline-flex items-center px-4 py-2 rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 shadow-sm"
+          >
+            <svg className="w-4 h-4 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            历史记录
+          </a>
+        </div>
+
         <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* 题目材料和问题输入区域 */}
           <div className="mb-6">
@@ -234,13 +493,16 @@ export default function Home() {
                   style={{ width: `${Math.min(100, Math.round(progress))}%` }}
                 />
               </div>
-              <div className="mt-2 text-xs text-gray-500 text-right">{Math.min(100, Math.round(progress))}%</div>
+              <div className="mt-2 text-xs text-gray-600 flex items-center justify-between">
+                <span>{statusText || "处理中..."}</span>
+                <span>{Math.min(100, Math.round(progress))}%</span>
+              </div>
             </div>
           )}
 
           <div className="mb-8 text-center">
             <button
-              onClick={handleSubmit}
+              onClick={handleSubmitStream}
               disabled={isLoading || !questionMaterial.trim() || !myAnswer.trim()}
               className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-8 rounded-xl transition-colors duration-200 shadow-lg hover:shadow-xl mr-4"
             >

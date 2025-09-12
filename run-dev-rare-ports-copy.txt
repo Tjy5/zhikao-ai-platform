@@ -6,13 +6,14 @@ param(
   [switch]$NoDB
 )
 
+# Set default values if not provided
 if (-not $BackendPort) { $BackendPort = 65123 }
 if (-not $FrontendPort) { $FrontendPort = 65124 }
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-Write-Host "🚀 启动全栈开发（固定端口 + 端口复用）" -ForegroundColor Green
+Write-Host "🚀 启动全栈开发环境（稀有固定端口 + 端口复用）" -ForegroundColor Green
 Write-Host ("=" * 80) -ForegroundColor Gray
 
 function Test-PortInUse {
@@ -49,7 +50,7 @@ function Maybe-Start-DB {
   $composeAtRoot = Join-Path $PSScriptRoot "docker-compose.yml"
   if (Test-Path $composeAtRoot) {
     if (Get-Command docker -ErrorAction SilentlyContinue) {
-      Write-Host "🗄️ 通过 Docker Compose 启动 Postgres（若未运行）" -ForegroundColor Yellow
+      Write-Host "🐘 通过 Docker Compose 启动 Postgres（如果尚未运行）" -ForegroundColor Yellow
       try {
         Push-Location $PSScriptRoot
         docker compose up -d db | Out-Host
@@ -70,14 +71,14 @@ function Ensure-BackendVenvAndDeps {
   Push-Location $backendDir
   try {
     if (-not (Test-Path $venvPath)) {
-      Write-Host "[后端] 创建虚拟环境 .venv" -ForegroundColor Yellow
+      Write-Host "[后端] 正在创建虚拟环境 .venv" -ForegroundColor Yellow
       python -m venv .venv
     }
     $pipExe = Join-Path $venvPath 'Scripts/pip.exe'
     $pythonExe = Join-Path $venvPath 'Scripts/python.exe'
     if (-not (Test-Path $pythonExe)) { throw "Python venv not created correctly at $venvPath" }
     if (Test-Path (Join-Path $backendDir 'requirements.txt')) {
-      Write-Host "[后端] 安装依赖" -ForegroundColor Yellow
+      Write-Host "[后端] 安装 Python 依赖" -ForegroundColor Yellow
       & $pythonExe -m pip install --upgrade pip | Out-Host
       & $pipExe install -r (Join-Path $backendDir 'requirements.txt') | Out-Host
     }
@@ -110,7 +111,7 @@ function Ensure-FrontendDeps {
   Push-Location $frontendDir
   try {
     if (-not (Test-Path (Join-Path $frontendDir 'node_modules'))) {
-      Write-Host "[前端] 安装 Node 依赖 (npm install)" -ForegroundColor Yellow
+      Write-Host "[前端] 安装 Node 依赖（npm install）" -ForegroundColor Yellow
       & npm install | Out-Host
     }
   } finally {
@@ -118,45 +119,17 @@ function Ensure-FrontendDeps {
   }
 }
 
-function Run-DBMigrations {
-  param([string]$BackendDir,[string]$PythonExe,[int]$Retries = 10)
-  # 等待 5432 端口可用
-  if (-not (Wait-ForPortUp -Port 5432 -TimeoutSec 45)) {
-    Write-Warning "[db] 端口 5432 未就绪，可能数据库尚未启动"
-  }
-  for ($i=0; $i -lt $Retries; $i++) {
-    try {
-      Push-Location $BackendDir
-      $alembicCmd = Join-Path (Split-Path $PythonExe -Parent) 'alembic.exe'
-      if (Test-Path $alembicCmd) {
-        & $alembicCmd upgrade head | Out-Host
-      } else {
-        alembic upgrade head | Out-Host
-      }
-      Write-Host "[db] Alembic 迁移完成" -ForegroundColor Green
-      return
-    } catch {
-      Write-Warning "[db] 迁移失败(第$($i+1)次)：$($_.Exception.Message)"
-      Start-Sleep -Seconds 3
-    } finally {
-      Pop-Location
-    }
-  }
-  throw "[db] 多次尝试迁移仍失败，请检查数据库连接/权限配置"
-}
-
 function Start-Backend {
   param([int]$Port)
   $backendDir = Join-Path $PSScriptRoot 'backend'
   if (Test-PortInUse -PortToTest $Port) {
-    Write-Host "🟢 Backend already running · http://localhost:$Port" -ForegroundColor Cyan
+    Write-Host "📡 Backend already running — reusing http://localhost:$Port" -ForegroundColor Cyan
     Write-PortFile -Name 'backend' -Port $Port | Out-Null
     return $null
   }
   $pythonExe = Ensure-BackendVenvAndDeps
   Maybe-Start-DB
-  Run-DBMigrations -BackendDir $backendDir -PythonExe $pythonExe
-  Write-Host "🔧 Starting Backend on port $Port" -ForegroundColor Yellow
+  Write-Host "📡 Starting Backend on port $Port" -ForegroundColor Yellow
   $job = Start-Job -ScriptBlock {
     param($root, $py, $port)
     Set-Location (Join-Path $root 'backend')
@@ -169,34 +142,30 @@ function Start-Frontend {
   param([int]$Port,[int]$BackendPort)
   $frontendDir = Join-Path $PSScriptRoot 'frontend'
   if (Test-PortInUse -PortToTest $Port) {
-    Write-Host "🟢 Frontend already running · http://localhost:$Port" -ForegroundColor Cyan
+    Write-Host "🌐 Frontend already running — reusing http://localhost:$Port" -ForegroundColor Cyan
     Update-FrontendApiConfig -Frontend $Port -Backend $BackendPort
     Write-PortFile -Name 'frontend' -Port $Port | Out-Null
     return $null
   }
   Ensure-FrontendDeps
   Update-FrontendApiConfig -Frontend $Port -Backend $BackendPort
-  Write-Host "🔧 Starting Frontend on port $Port" -ForegroundColor Yellow
+  Write-Host "🌐 Starting Frontend on port $Port" -ForegroundColor Yellow
   $job = Start-Job -ScriptBlock {
     param($root, $port)
     Set-Location (Join-Path $root 'frontend')
     $env:NODE_OPTIONS = "--max_old_space_size=4096"
     $env:FRONTEND_PORT = $port
+    # Launch Node directly to avoid npm wrapper exiting the job early
     & node start-server.js | Out-Host
   } -ArgumentList $PSScriptRoot, $Port
   return $job
 }
 
-# 启动顺序：确保 DB 就绪并迁移 → 启动/复用后端 → 启动/复用前端
-$backendDir = Join-Path $PSScriptRoot 'backend'
-$pyExeForMigrate = Ensure-BackendVenvAndDeps
-Maybe-Start-DB
-Run-DBMigrations -BackendDir $backendDir -PythonExe $pyExeForMigrate
-
+# Start services (reuse if already running)
 $backendJob = Start-Backend -Port $BackendPort
 if ($backendJob) {
   if (-not (Wait-ForPortUp -Port $BackendPort -TimeoutSec 45)) {
-    Write-Warning "[后端] 未在超时内开放端口 $BackendPort，请查看 Job 输出"
+    Write-Warning "[后端] 未在超时时间内开放端口 $BackendPort，请检查 Job 输出。"
   }
 }
 Write-PortFile -Name 'backend' -Port $BackendPort | Out-Null
@@ -204,38 +173,41 @@ Write-PortFile -Name 'backend' -Port $BackendPort | Out-Null
 $frontendJob = Start-Frontend -Port $FrontendPort -BackendPort $BackendPort
 if ($frontendJob) {
   if (-not (Wait-ForPortUp -Port $FrontendPort -TimeoutSec 60)) {
-    Write-Warning "[前端] 未在超时内开放端口 $FrontendPort，尝试查看日志"
+    Write-Warning "[前端] 未在超时时间内开放端口 $FrontendPort，以下为前端启动输出："
     try { Receive-Job -Id $frontendJob.Id -Keep | Out-Host } catch { }
   }
 }
 Write-PortFile -Name 'frontend' -Port $FrontendPort | Out-Null
 
-Write-Host ""; Write-Host ("=" * 80) -ForegroundColor Green
-Write-Host "✅ 服务已就绪" -ForegroundColor Green
+Write-Host ""
 Write-Host ("=" * 80) -ForegroundColor Green
-Write-Host "🌐 前端:  http://localhost:$FrontendPort" -ForegroundColor Cyan
-Write-Host "🧩 后端:  http://localhost:$BackendPort" -ForegroundColor Magenta
-Write-Host "   📚 文档: http://localhost:$BackendPort/docs" -ForegroundColor Magenta
-Write-Host ""; Write-Host "⏹ 关闭：在此窗口按 Ctrl+C（持续前台运行，便于观察）" -ForegroundColor Yellow
+Write-Host "🎉 开发服务已就绪！" -ForegroundColor Green
+Write-Host ("=" * 80) -ForegroundColor Green
+Write-Host "🌐 前端：  http://localhost:$FrontendPort" -ForegroundColor Cyan
+Write-Host "📡 后端：  http://localhost:$BackendPort" -ForegroundColor Magenta
+Write-Host "   📖 文档： http://localhost:$BackendPort/docs" -ForegroundColor Magenta
+Write-Host ""; Write-Host "🔧 关闭：在此窗口按 Ctrl+C；如为复用模式，请到原窗口停止服务。" -ForegroundColor Yellow
 Write-Host ("=" * 80) -ForegroundColor Green
 
 try {
   while ($true) {
     if ($backendJob -and (Get-Job -Id $backendJob.Id -ErrorAction SilentlyContinue)) {
       $bState = (Get-Job -Id $backendJob.Id).State
-      if ($bState -ne 'Running') { Write-Warning "[后端] Job 状态=$bState"; break }
+      if ($bState -ne 'Running') { Write-Warning "[后端] Job 状态：$bState"; break }
     }
     if ($frontendJob -and (Get-Job -Id $frontendJob.Id -ErrorAction SilentlyContinue)) {
       $fState = (Get-Job -Id $frontendJob.Id).State
-      if ($fState -ne 'Running') { Write-Warning "[前端] Job 状态=$fState"; break }
+      if ($fState -ne 'Running') { Write-Warning "[前端] Job 状态：$fState"; break }
     }
     Start-Sleep -Seconds 5
   }
 } catch {
-  Write-Host "`n🛑 停止服务..." -ForegroundColor Yellow
+  Write-Host "`n🛑 正在停止开发服务..." -ForegroundColor Yellow
 } finally {
   if ($backendJob) { Stop-Job -Id $backendJob.Id -PassThru | Remove-Job | Out-Null }
   if ($frontendJob) { Stop-Job -Id $frontendJob.Id -PassThru | Remove-Job | Out-Null }
-  Write-Host "🧹 已停止。" -ForegroundColor Gray
+  Write-Host "👋 开发环境已停止。" -ForegroundColor Gray
 }
+
+
 

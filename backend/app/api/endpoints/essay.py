@@ -13,6 +13,12 @@ from app.core.config import settings
 import logging
 import json
 import asyncio
+from app.services.history_service import (
+    append_history,
+    list_history,
+    get_history_item,
+    clear_history,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -94,8 +100,8 @@ async def grade_essay_progressive(submission: EssaySubmission):
                     "teacherComments": diagnosis_data.get("teacher_comments", ""),
                     "partial": True  # 标记为部分结果
                 }
-                
-                yield f"data: {json.dumps(stage1_response, ensure_ascii=False)}\n\n"
+                # Encode explicitly to UTF-8 to avoid client-side decode errors
+                yield (f"data: {json.dumps(stage1_response, ensure_ascii=False)}\n\n").encode("utf-8", errors="replace")
                 
                 # ===== 第二阶段：整体评价 (进度100%) =====
                 logger.info("第二阶段：整体评价生成...")
@@ -109,7 +115,7 @@ async def grade_essay_progressive(submission: EssaySubmission):
                     total_score = 75.0
                 
                 # 获取整体评价作为feedback
-                overall_evaluation = evaluation_data.get("overall_evaluation", "AI批改完成")
+                overall_evaluation = evaluation_data.get("overall_evaluation", "AI专家已完成综合评估，请参考详细的专业诊断意见")
                 teacher_comments = diagnosis_data.get("teacher_comments", "")
                 
                 # 合并反馈
@@ -142,8 +148,18 @@ async def grade_essay_progressive(submission: EssaySubmission):
                     "finalComments": evaluation_data.get("final_comments", ""),
                     "partial": False  # 标记为完整结果
                 }
-                
-                yield f"data: {json.dumps(stage2_response, ensure_ascii=False)}\n\n"
+                # Save history (DB only; raise on failure)
+                append_history(
+                    kind="progressive",
+                    request={
+                        "content": submission.content,
+                        "question_type": submission.question_type,
+                    },
+                    response=stage2_response,
+                    extra={"stage1": stage1_response},
+                )
+
+                yield (f"data: {json.dumps(stage2_response, ensure_ascii=False)}\n\n").encode("utf-8", errors="replace")
                 
             except Exception as e:
                 logger.error(f"Progressive grading failed: {str(e)}")
@@ -155,16 +171,18 @@ async def grade_essay_progressive(submission: EssaySubmission):
                     "error": str(e)[:200],
                     "partial": False
                 }
-                yield f"data: {json.dumps(error_response, ensure_ascii=False)}\n\n"
+                yield (f"data: {json.dumps(error_response, ensure_ascii=False)}\n\n").encode("utf-8", errors="replace")
 
+        # Proper SSE response: ensure correct media type and disable buffering
         return StreamingResponse(
             generate_progressive_response(),
-            media_type="text/plain",
+            media_type="text/event-stream; charset=utf-8",
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "Content-Type": "text/event-stream"
-            }
+                # Disable proxy buffering (e.g., nginx) to avoid truncated/decoded bodies
+                "X-Accel-Buffering": "no",
+            },
         )
 
     except Exception as e:
@@ -230,6 +248,16 @@ async def grade_essay(submission: EssaySubmission):
             "questionTypeSource": question_type_source,
         }
 
+        # Persist history (DB only; raise on failure)
+        append_history(
+            kind="grade",
+            request={
+                "content": submission.content,
+                "question_type": submission.question_type,
+            },
+            response=response_data,
+        )
+
         # Final public-output cleanup disabled to avoid over-processing descriptions
         # response_data = final_insurance_scan(response_data)
         return response_data
@@ -278,3 +306,38 @@ async def grade_essay(submission: EssaySubmission):
 @router.get("/essays/ai-status")
 async def check_ai_service_status():
     return await get_ai_service_status()
+
+
+@router.get("/essays/history")
+async def get_essay_history(limit: int = 20):
+    """List recent grading history (most recent first)."""
+    try:
+        items = list_history(limit=limit)
+        return {"items": items}
+    except Exception as e:
+        logger.error(f"List history failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="历史记录读取失败")
+
+
+@router.get("/essays/history/{item_id}")
+async def get_essay_history_item(item_id: str):
+    try:
+        item = get_history_item(item_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="未找到对应历史记录")
+        return item
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get history item failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="历史记录读取失败")
+
+
+@router.delete("/essays/history")
+async def delete_essay_history():
+    try:
+        count = clear_history()
+        return {"deleted": count}
+    except Exception as e:
+        logger.error(f"Clear history failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="历史记录清空失败")
