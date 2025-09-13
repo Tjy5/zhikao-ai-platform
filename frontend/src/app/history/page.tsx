@@ -629,6 +629,7 @@ export default function HistoryPage() {
                                       }}
                                       dangerouslySetInnerHTML={{
                                         __html: sanitizeText(d.description)
+                                          .replace(/\\n/g, '\n')  // 首先将字面量\n转换为真实换行符
                                           .replace(/\r\n/g, '\n')
                                           .replace(/\n\n+/g, '</p><p class="mb-2 mt-2">')
                                           .replace(/\n/g, "<br/>")
@@ -665,6 +666,7 @@ export default function HistoryPage() {
                                 }}
                                 dangerouslySetInnerHTML={{
                                   __html: sanitizeText(String((selected?.response as Record<string, unknown>)?.feedback))
+                                    .replace(/\\n/g, '\n')  // 首先将字面量\n转换为真实换行符
                                     .replace(/\r\n/g, '\n')
                                     .replace(/\n\n+/g, '</p><p class="mb-4 mt-4">')
                                     .replace(/\n/g, "<br/>")
@@ -705,6 +707,7 @@ export default function HistoryPage() {
                                         }}
                                         dangerouslySetInnerHTML={{
                                           __html: sanitizeText(String(s))
+                                            .replace(/\\n/g, '\n')  // 首先将字面量\n转换为真实换行符
                                             .replace(/\r\n/g, '\n')
                                             .replace(/\n\n+/g, '</p><p class="mb-3 mt-3">')
                                             .replace(/\n/g, '<br/>')

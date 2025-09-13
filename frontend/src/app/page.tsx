@@ -672,6 +672,7 @@ export default function Home() {
                                         }}
                                         dangerouslySetInnerHTML={{ 
                                           __html: detail.description
+                                            .replace(/\\n/g, '\n')  // 首先将字面量\n转换为真实换行符
                                             .replace(/\r\n/g, '\n')
                                             .replace(/\n\n+/g, '</p><p class="mb-3 mt-3">')
                                             .replace(/\n/g, '<br/>')
@@ -740,6 +741,7 @@ export default function Home() {
                           }}
                           dangerouslySetInnerHTML={{ 
                             __html: gradingResult.feedback
+                              .replace(/\\n/g, '\n')  // 首先将字面量\n转换为真实换行符
                               .replace(/\r\n/g, '\n')
                               .replace(/\n\n+/g, '</p><p class="mb-5 mt-5">')
                               .replace(/\n/g, '<br/>')
@@ -791,6 +793,7 @@ export default function Home() {
                               }}
                               dangerouslySetInnerHTML={{
                                 __html: suggestion
+                                  .replace(/\\n/g, '\n')  // 首先将字面量\n转换为真实换行符
                                   .replace(/\r\n/g, '\n')
                                   .replace(/\n\n+/g, '</p><p class="mb-4 mt-4">')
                                   .replace(/\n/g, '<br/>')

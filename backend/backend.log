@@ -1,7 +1,0 @@
-INFO:     Will watch for changes in these directories: ['D:\\some\\backend']
-INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
-INFO:     Started reloader process [28976] using WatchFiles
-INFO:     Started server process [25632]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-WARNING:  WatchFiles detected changes in 'app\api\endpoints\essay.py'. Reloading...
