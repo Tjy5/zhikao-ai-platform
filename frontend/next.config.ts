@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   experimental: {
-    turbotrace: { logLevel: 'error' }
+    // turbotrace has been removed in Next.js 15
   }
 };
 
