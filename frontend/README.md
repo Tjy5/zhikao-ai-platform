@@ -1,8 +1,26 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+## 智考公考伴侣 - 前端项目
 
-First, run the development server:
+本项目是智考公考伴侣的前端部分，基于 Next.js 15 + React 19 + TypeScript 构建。
+
+## 快速启动
+
+### 推荐方式：使用全栈启动脚本
+
+在项目根目录使用以下脚本一键启动前后端：
+
+```powershell
+# 推荐：动态端口分配（自动处理端口占用）
+.\dev-fullstack.ps1
+
+# 固定端口开发（稀有端口，避免冲突）
+D:\some\run-dev-rare-ports.ps1
+```
+
+### 单独启动前端（仅开发调试用）
+
+如果需要单独启动前端进行调试，可以使用：
 
 ```bash
 npm run dev
@@ -14,7 +32,9 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**注意**：单独启动前端时，需要确保后端服务已经在运行，否则前端将无法正常工作。
+
+打开 [http://localhost:3000](http://localhost:3000) 查看结果。
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

@@ -28,7 +28,7 @@ This is an AI-powered public examination platform (智考公考伴侣) that prov
 # - Won't interfere with other applications
 
 # Fixed Port Development (with reuse functionality)
-.\run-dev-rare-ports.ps1
+D:\some\run-dev-rare-ports.ps1
 
 # Features:
 # - Fixed rare ports (backend: 65123, frontend: 65124) to avoid conflicts
@@ -212,7 +212,7 @@ docker-compose up            # Start all services
    - Displays actual service URLs when ready
    - Monitors service health continuously
 
-2. **Fixed Port Development**: Run `.\run-dev-rare-ports.ps1`
+2. **Fixed Port Development**: Run `D:\some\run-dev-rare-ports.ps1`
    - Uses rare ports (backend: 65123, frontend: 65124) to avoid conflicts
    - Intelligently reuses existing services if ports are occupied
    - No "port already in use" errors - automatically detects and reuses running instances
@@ -259,7 +259,7 @@ docker-compose up            # Start all services
 - **Clean Shutdown**: Proper cleanup when stopped with Ctrl+C
 - **Informative Output**: Shows actual service URLs and status
 
-#### `run-dev-rare-ports.ps1` - Fixed Port Development with Reuse
+#### `run-dev-rare-ports.ps1` (D:\some\run-dev-rare-ports.ps1) - Fixed Port Development with Reuse
 - **Rare Ports**: Uses uncommon ports (65123/65124) to avoid conflicts with other applications
 - **Intelligent Reuse**: Automatically detects and reuses existing services if ports are occupied
 - **No Port Conflicts**: Never shows "port already in use" errors - intelligently reuses running instances

@@ -22,10 +22,10 @@
 .\dev-fullstack.ps1
 
 # 固定端口开发（稀有端口，避免冲突）
-.\run-dev-rare-ports.ps1
+D:\some\run-dev-rare-ports.ps1
 
 # 自定义端口
-.\run-dev-rare-ports.ps1 -BackendPort 8004 -FrontendPort 3000
+D:\some\run-dev-rare-ports.ps1 -BackendPort 8004 -FrontendPort 3000
 ```
 
 ### 访问地址
@@ -69,7 +69,7 @@
 
 ```
 ├── dev-fullstack.ps1       # 动态端口全栈启动脚本
-├── run-dev-rare-ports.ps1  # 固定端口启动脚本（稀有端口）
+├── run-dev-rare-ports.ps1  # 固定端口启动脚本（稀有端口，完整路径：D:\some\run-dev-rare-ports.ps1）
 ├── quick-restart.bat       # 快速服务管理工具
 ├── backend/                # FastAPI后端
 │   ├── app/               # 应用源码
@@ -111,7 +111,7 @@ OPENAI_MODEL_NAME=gpt-4o-mini
 .\dev-fullstack.ps1
 
 # 固定端口（避免冲突）
-.\run-dev-rare-ports.ps1
+D:\some\run-dev-rare-ports.ps1
 ```
 
 ### API 接口
