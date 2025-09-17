@@ -23,7 +23,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.db.database import Base
 from app.core.config import settings
-from app.models import user, template # Import all models here
+from app.models import user, history, question # Import all models here
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

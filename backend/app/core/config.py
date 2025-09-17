@@ -19,7 +19,7 @@ class Settings:
         self._env_cache = {
             'OPENAI_API_KEY': os.getenv("OPENAI_API_KEY", "sk-kE7sYiXtSTNK6MLWMyV3oXOFYDJg9CYohKhhA6ZgGenvm7Fo"),
             'OPENAI_API_BASE': os.getenv("OPENAI_API_BASE", "https://api.kkyyxx.xyz/v1"),
-            'OPENAI_MODEL_NAME': os.getenv("OPENAI_MODEL_NAME", "openai/gpt-oss-120b"),
+            'OPENAI_MODEL_NAME': os.getenv("OPENAI_MODEL_NAME", "openai/gpt-oss-20b"),
             'DATABASE_URL': os.getenv("DATABASE_URL", ""),
             'DEBUG': os.getenv("DEBUG", "False").lower() == "true"
         }

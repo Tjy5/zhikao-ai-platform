@@ -1,9 +1,10 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 import traceback
 import logging
 from app.api.endpoints import essay
+from .api.endpoints import question
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -99,10 +100,18 @@ app.add_middleware(
 # Include essay grading API routes
 app.include_router(essay.router, prefix="/api/v1", tags=["essay"])
 
-# Root path health check
+# Include question management API routes
+app.include_router(question.router, prefix="/api/v1/questions", tags=["questions"])
+
+# Root redirects to admin dashboard for easier access
 @app.get("/")
 async def root():
-    return {"message": "AI Public Exam Platform Backend API is running"}
+    return RedirectResponse(url="/api/v1/questions/admin/dashboard")
+
+# Convenience admin path
+@app.get("/admin")
+async def admin_root():
+    return RedirectResponse(url="/api/v1/questions/admin/dashboard")
 
 # Health check endpoint
 @app.get("/health")

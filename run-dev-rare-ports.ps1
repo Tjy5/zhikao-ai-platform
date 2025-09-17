@@ -71,7 +71,11 @@ function Ensure-BackendVenvAndDeps {
   try {
     if (-not (Test-Path $venvPath)) {
       Write-Host "[后端] 创建虚拟环境 .venv" -ForegroundColor Yellow
-      python -m venv .venv
+      $pythonCmd = $null
+      if (Get-Command python -ErrorAction SilentlyContinue) { $pythonCmd = 'python' }
+      elseif (Get-Command py -ErrorAction SilentlyContinue) { $pythonCmd = 'py -3' }
+      else { Write-Error "未找到 Python，请先安装 Python 3.x 并加入 PATH" }
+      & $pythonCmd -m venv .venv | Out-Host
     }
     $pipExe = Join-Path $venvPath 'Scripts/pip.exe'
     $pythonExe = Join-Path $venvPath 'Scripts/python.exe'
@@ -120,6 +124,7 @@ function Ensure-FrontendDeps {
 
 function Run-DBMigrations {
   param([string]$BackendDir,[string]$PythonExe,[int]$Retries = 10)
+  if ($NoDB) { Write-Host "[db] NoDB 开关启用，跳过迁移" -ForegroundColor Yellow; return }
   # 等待 5432 端口可用
   if (-not (Wait-ForPortUp -Port 5432 -TimeoutSec 45)) {
     Write-Warning "[db] 端口 5432 未就绪，可能数据库尚未启动"
@@ -155,13 +160,20 @@ function Start-Backend {
   }
   $pythonExe = Ensure-BackendVenvAndDeps
   Maybe-Start-DB
-  Run-DBMigrations -BackendDir $backendDir -PythonExe $pythonExe
+  # 判断是否使用 SQLite 以避免本地未装 Docker/Postgres 时直接失败
+  $useSQLite = $NoDB -or (-not (Wait-ForPortUp -Port 5432 -TimeoutSec 45))
+  if ($useSQLite) {
+    Write-Host "[后端] 未检测到 Postgres，使用 SQLite 本地文件 dev.db，跳过迁移" -ForegroundColor DarkYellow
+  } else {
+    Run-DBMigrations -BackendDir $backendDir -PythonExe $pythonExe
+  }
   Write-Host "🔧 Starting Backend on port $Port" -ForegroundColor Yellow
   $job = Start-Job -ScriptBlock {
-    param($root, $py, $port)
+    param($root, $py, $port, $dbUrl)
     Set-Location (Join-Path $root 'backend')
+    if ($dbUrl) { $env:DATABASE_URL = $dbUrl }
     & $py -m uvicorn app.main:app --reload --host 0.0.0.0 --port $port
-  } -ArgumentList $PSScriptRoot, $pythonExe, $Port
+  } -ArgumentList $PSScriptRoot, $pythonExe, $Port, ($useSQLite ? "sqlite:///./dev.db" : $null)
   return $job
 }
 
@@ -191,12 +203,17 @@ function Start-Frontend {
 $backendDir = Join-Path $PSScriptRoot 'backend'
 $pyExeForMigrate = Ensure-BackendVenvAndDeps
 Maybe-Start-DB
-Run-DBMigrations -BackendDir $backendDir -PythonExe $pyExeForMigrate
+if (-not $NoDB -and (Wait-ForPortUp -Port 5432 -TimeoutSec 45)) {
+  Run-DBMigrations -BackendDir $backendDir -PythonExe $pyExeForMigrate
+} else {
+  Write-Host "[db] 跳过预迁移：未启用或数据库未就绪（将继续启动后端）" -ForegroundColor DarkYellow
+}
 
 $backendJob = Start-Backend -Port $BackendPort
 if ($backendJob) {
   if (-not (Wait-ForPortUp -Port $BackendPort -TimeoutSec 45)) {
     Write-Warning "[后端] 未在超时内开放端口 $BackendPort，请查看 Job 输出"
+    try { Receive-Job -Id $backendJob.Id -Keep | Out-Host } catch { }
   }
 }
 Write-PortFile -Name 'backend' -Port $BackendPort | Out-Null
@@ -214,8 +231,9 @@ Write-Host ""; Write-Host ("=" * 80) -ForegroundColor Green
 Write-Host "✅ 服务已就绪" -ForegroundColor Green
 Write-Host ("=" * 80) -ForegroundColor Green
 Write-Host "🌐 前端:  http://localhost:$FrontendPort" -ForegroundColor Cyan
-Write-Host "🧩 后端:  http://localhost:$BackendPort" -ForegroundColor Magenta
-Write-Host "   📚 文档: http://localhost:$BackendPort/docs" -ForegroundColor Magenta
+Write-Host "🧩 后端:  http://localhost:$BackendPort  （根路径将跳转到管理页面）" -ForegroundColor Magenta
+Write-Host "   📋 管理页: http://localhost:$BackendPort  或  http://localhost:$BackendPort/admin" -ForegroundColor Magenta
+Write-Host "   📚 API 文档: http://localhost:$BackendPort/docs" -ForegroundColor Magenta
 Write-Host ""; Write-Host "⏹ 关闭：在此窗口按 Ctrl+C（持续前台运行，便于观察）" -ForegroundColor Yellow
 Write-Host ("=" * 80) -ForegroundColor Green
 
@@ -238,4 +256,3 @@ try {
   if ($frontendJob) { Stop-Job -Id $frontendJob.Id -PassThru | Remove-Job | Out-Null }
   Write-Host "🧹 已停止。" -ForegroundColor Gray
 }
-

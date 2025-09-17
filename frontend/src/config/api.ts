@@ -4,3 +4,4 @@ export const API_BASE_URL = process.env.NODE_ENV === 'production'
   : 'http://localhost:65123';
 
 export const FRONTEND_URL = 'http://localhost:65124';
+
