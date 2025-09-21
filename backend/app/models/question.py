@@ -22,6 +22,8 @@ class Question(Base):
     paragraph_range = Column(String(50))           # 段落范围
     total_images = Column(Integer, default=0)      # 图片总数
     total_text_length = Column(Integer, default=0) # 文本总长度
+    answer = Column(String(10))                    # 正确答案（A/B/C/D）
+    answer_explanation = Column(Text)              # 答案解析
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

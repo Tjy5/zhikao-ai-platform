@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 import traceback
 import logging
 from app.api.endpoints import essay
-from .api.endpoints import question
+from .api.endpoints import question, assessment, practice
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -102,6 +102,12 @@ app.include_router(essay.router, prefix="/api/v1", tags=["essay"])
 
 # Include question management API routes
 app.include_router(question.router, prefix="/api/v1/questions", tags=["questions"])
+
+# Include assessment API routes
+app.include_router(assessment.router, prefix="/api/v1/assessment", tags=["assessment"])
+
+# Include practice API routes
+app.include_router(practice.router, prefix="/api/v1/practice", tags=["practice"])
 
 # Root redirects to admin dashboard for easier access
 @app.get("/")

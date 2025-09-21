@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 智能评分系统说明</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .admin-nav {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .admin-nav a {
+            display: inline-block;
+            color: #495057;
+            text-decoration: none;
+            background: #f8f9fa;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin: 0 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+            font-weight: 500;
+            border: 1px solid #dee2e6;
+        }
+
+        .admin-nav a:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .admin-nav a.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-color: #667eea;
+        }
+
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid #dee2e6;
+        }
+
+        .section h3 {
+            color: #495057;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .feature-box {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+        }
+
+        .feature-box h4 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .feature-item span {
+            margin-right: 8px;
+            margin-top: 2px;
+        }
+
+        .feature-item-text h5 {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.9em;
+            margin: 0;
+        }
+
+        .feature-item-text p {
+            color: #6c757d;
+            font-size: 0.8em;
+            margin: 2px 0 0 0;
+        }
+
+        .info-box {
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid;
+        }
+
+        .info-box-blue {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+            border-color: #bbdefb;
+            color: #1565c0;
+        }
+
+        .info-box-green {
+            background: #e8f5e8;
+            border-color: #c8e6c9;
+            color: #2e7d32;
+        }
+
+        .info-box-yellow {
+            background: #fff3e0;
+            border-color: #ffcc02;
+            color: #ef6c00;
+        }
+
+        .weight-grid {
+            font-size: 0.85em;
+            line-height: 1.4;
+        }
+
+        .weight-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .weight-value {
+            font-weight: 600;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 管理员导航 -->
+        <div class="admin-nav">
+            <a href="/api/v1/questions/admin/dashboard">📚 题目库管理</a>
+            <a href="/api/v1/questions/admin/scoring-system" class="active">🧠 智能评分系统</a>
+        </div>
+        
+        <!-- 页面标题 -->
+        <div class="header">
+            <h1>🧠 智能评分系统说明</h1>
+            <p>AI驱动的动态权重评分系统 - 科学、准确、可扩展</p>
+        </div>
+
+
+        <!-- 主要内容 -->
+        <div class="main-content">
+            
+            <!-- 评分特点和权重系统 -->
+            <div class="section">
+                <h3>📈 智能评分特点与权重系统</h3>
+                <div class="grid-2">
+                    
+                    <!-- 评分特点 -->
+                    <div class="feature-box">
+                        <h4>📈 智能评分特点</h4>
+                        <div>
+                            <div class="feature-item">
+                                <span style="color: #007bff;">🎯</span>
+                                <div class="feature-item-text">
+                                    <h5>动态权重计算</h5>
+                                    <p>根据题库来源智能调整权重</p>
+                                </div>
+                            </div>
+                            <div class="feature-item">
+                                <span style="color: #28a745;">✓</span>
+                                <div class="feature-item-text">
+                                    <h5>多级别兼容</h5>
+                                    <p>支持副省级、市地级混合评分</p>
+                                </div>
+                            </div>
+                            <div class="feature-item">
+                                <span style="color: #6f42c1;">🔬</span>
+                                <div class="feature-item-text">
+                                    <h5>置信度调整</h5>
+                                    <p>样本量少时向整体回归</p>
+                                </div>
+                            </div>
+                            <div class="feature-item">
+                                <span style="color: #fd7e14;">📈</span>
+                                <div class="feature-item-text">
+                                    <h5>标准分转换</h5>
+                                    <p>70分基准线，科学校准分数</p>
+                                </div>
+                            </div>
+                            <div class="feature-item">
+                                <span style="color: #dc3545;">🛡️</span>
+                                <div class="feature-item-text">
+                                    <h5>一致性保证</h5>
+                                    <p>移除随机性，结果可重现</p>
+                                </div>
+                            </div>
+                            <div class="feature-item">
+                                <span style="color: #6610f2;">🚀</span>
+                                <div class="feature-item-text">
+                                    <h5>未来扩展性</h5>
+                                    <p>支持新增题库来源</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 权重系统详情 -->
+                    <div class="feature-box">
+                        <h4>⚖️ 权重系统详情</h4>
+                        
+                        <!-- 智能权重系统 -->
+                        <div class="info-box info-box-blue">
+                            <p style="font-size: 0.9em; margin: 0;">
+                                <span style="font-weight: 600;">🧠 智能权重系统：</span>
+                                系统自动分析题库来源（副省级135题、市地级130题），根据实际题目分布动态计算权重，确保评分始终准确反映真实考试标准。
+                            </p>
+                        </div>
+
+                        <!-- 权重策略 -->
+                        <div class="info-box info-box-green">
+                            <p style="font-size: 0.9em; margin: 0;">
+                                <span style="font-weight: 600;">📊 权重策略：</span><br>
+                                • 单一来源≥80%：使用对应级别标准权重<br>
+                                • 混合题库：智能加权平均<br>
+                                • 未知来源：使用通用权重补充
+                            </p>
+                        </div>
+
+                        <!-- 分数说明 -->
+                        <div class="info-box info-box-yellow">
+                            <p style="font-size: 0.9em; margin: 0;">
+                                <span style="font-weight: 600;">💡 分数说明：</span>
+                                70分为平均水平，80分以上为良好，90分以上为优秀。分数基于标准分转换，科学反映真实能力水平。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 标准权重配置 -->
+            <div class="section">
+                <h3>⚖️ 标准权重配置</h3>
+                <div class="grid-3">
+                    
+                    <!-- 副省级权重 -->
+                    <div class="feature-box">
+                        <h4>🏛️ 副省级权重 (135题)</h4>
+                        <div class="weight-grid">
+                            <div class="weight-row">
+                                <span>政治理论:</span><span class="weight-value">16%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>常识判断:</span><span class="weight-value">9%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>言语理解与表达:</span><span class="weight-value">24%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>数量关系:</span><span class="weight-value">9%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>判断推理:</span><span class="weight-value">28%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>资料分析:</span><span class="weight-value">14%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 市地级权重 -->
+                    <div class="feature-box">
+                        <h4>🏢 市地级权重 (130题)</h4>
+                        <div class="weight-grid">
+                            <div class="weight-row">
+                                <span>政治理论:</span><span class="weight-value">16%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>常识判断:</span><span class="weight-value">12%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>言语理解与表达:</span><span class="weight-value">24%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>数量关系:</span><span class="weight-value">8%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>判断推理:</span><span class="weight-value">28%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>资料分析:</span><span class="weight-value">12%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 通用权重 -->
+                    <div class="feature-box">
+                        <h4>⚙️ 通用权重 (默认)</h4>
+                        <div class="weight-grid">
+                            <div class="weight-row">
+                                <span>政治理论:</span><span class="weight-value">16%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>常识判断:</span><span class="weight-value">10%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>言语理解与表达:</span><span class="weight-value">24%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>数量关系:</span><span class="weight-value">8.5%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>判断推理:</span><span class="weight-value">28%</span>
+                            </div>
+                            <div class="weight-row">
+                                <span>资料分析:</span><span class="weight-value">13.5%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 评分算法详情 -->
+            <div class="section">
+                <h3>🔬 评分算法详情</h3>
+                <div class="grid-2">
+                    
+                    <!-- 计算流程 -->
+                    <div class="feature-box">
+                        <h4>📊 计算流程</h4>
+                        <div style="font-size: 0.9em; line-height: 1.6;">
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                                <strong>第一步：题型分数计算</strong><br>
+                                • 基于正确率：<code>base_score = correct_rate × 100</code><br>
+                                • 动态调整：及格以上+10分，30-60%+5分，低于30%+2分<br>
+                                • 边界限制：最终分数在0-100之间
+                            </div>
+                            
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                                <strong>第二步：权重计算</strong><br>
+                                • 分析题库来源分布<br>
+                                • 单一来源≥80%：使用标准权重<br>
+                                • 混合题库：智能加权平均<br>
+                                • 归一化确保权重总和为1
+                            </div>
+                            
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                <strong>第三步：综合评分</strong><br>
+                                • <code>总分 = Σ(题型分数 × 权重) / Σ权重</code><br>
+                                • 包含0分题型参与计算<br>
+                                • 确保结果准确反映真实水平
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 特殊处理 -->
+                    <div class="feature-box">
+                        <h4>⚡ 特殊处理机制</h4>
+                        <div style="font-size: 0.9em; line-height: 1.6;">
+                            <div class="feature-item">
+                                <span style="color: #28a745;">✓</span>
+                                <div class="feature-item-text">
+                                    <h5>0分题型处理</h5>
+                                    <p>0分题型正常参与权重计算，真实反映短板</p>
+                                </div>
+                            </div>
+                            
+                            <div class="feature-item">
+                                <span style="color: #17a2b8;">🎯</span>
+                                <div class="feature-item-text">
+                                    <h5>小样本调整</h5>
+                                    <p>题目数量少时向整体均值回归，提高稳定性</p>
+                                </div>
+                            </div>
+                            
+                            <div class="feature-item">
+                                <span style="color: #6f42c1;">🔄</span>
+                                <div class="feature-item-text">
+                                    <h5>动态权重</h5>
+                                    <p>根据实际题库构成自动调整权重配置</p>
+                                </div>
+                            </div>
+                            
+                            <div class="feature-item">
+                                <span style="color: #fd7e14;">⚖️</span>
+                                <div class="feature-item-text">
+                                    <h5>标准化输出</h5>
+                                    <p>确保不同来源题库得分具有可比性</p>
+                                </div>
+                            </div>
+                            
+                            <div class="feature-item">
+                                <span style="color: #dc3545;">🛡️</span>
+                                <div class="feature-item-text">
+                                    <h5>一致性保证</h5>
+                                    <p>相同答题情况下结果完全一致</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

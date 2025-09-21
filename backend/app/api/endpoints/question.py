@@ -175,6 +175,7 @@ async def list_questions(
                 Question.question_type,
                 Question.total_images,
                 Question.paragraph_range,
+                Question.answer,
                 Question.created_at,
             )
         )
@@ -235,6 +236,7 @@ async def list_questions(
                 "question_type": q.question_type,
                 "total_images": q.total_images,
                 "paragraph_range": q.paragraph_range,
+                "answer": q.answer,
                 "created_at": q.created_at.isoformat() if q.created_at else None
             }
             for q in questions
@@ -373,7 +375,7 @@ async def get_question(question_id: str, db: Session = Depends(get_db)):
     for img in images:
         image_list.append({
             "id": img.id,
-            "url": f"/api/v1/questions/images/{img.image_path}",
+            "url": f"http://localhost:65123/api/v1/questions/images/{img.image_path}",
             "image_type": img.image_type,
             "context_text": img.context_text,
             "paragraph_index": img.paragraph_index,
@@ -428,7 +430,7 @@ async def get_question(question_id: str, db: Session = Depends(get_db)):
                         is_option = (limg.image_type == 'option') or is_option_ctx(limg.context_text or '')
                         if is_option:
                             continue
-                        url = f"/api/v1/questions/images/{limg.image_path}"
+                        url = f"http://localhost:65123/api/v1/questions/images/{limg.image_path}"
                         if url in existing_urls:
                             continue
                         image_list.insert(0, {
@@ -468,7 +470,7 @@ async def get_question(question_id: str, db: Session = Depends(get_db)):
                     for gi in group_imgs:
                         if is_option_img(gi):
                             continue
-                        url = f"/api/v1/questions/images/{gi.image_path}"
+                        url = f"http://localhost:65123/api/v1/questions/images/{gi.image_path}"
                         if url in seen_paths:
                             continue
                         supplemental.append({
@@ -496,6 +498,8 @@ async def get_question(question_id: str, db: Session = Depends(get_db)):
         "total_images": question.total_images,
         "images": image_list,
         "source": question.source,
+        "answer": question.answer,
+        "answer_explanation": question.answer_explanation,
         "created_at": question.created_at.isoformat() if question.created_at else None,
     }
 
@@ -503,13 +507,49 @@ async def get_question(question_id: str, db: Session = Depends(get_db)):
 @router.get("/images/{image_filename}")
 async def get_image(image_filename: str):
     """获取图片文件"""
+    import logging
+    
+    # 调试信息
+    current_dir = os.getcwd()
+    upload_dir_abs = os.path.abspath(UPLOAD_DIR)
     image_path = os.path.join(UPLOAD_DIR, "images", image_filename)
+    image_path_abs = os.path.abspath(image_path)
+    
+    logging.info(f"🔍 图片请求: {image_filename}")
+    logging.info(f"📁 当前工作目录: {current_dir}")
+    logging.info(f"📁 UPLOAD_DIR: {UPLOAD_DIR}")
+    logging.info(f"📁 UPLOAD_DIR绝对路径: {upload_dir_abs}")
+    logging.info(f"📁 图片路径: {image_path}")
+    logging.info(f"📁 图片绝对路径: {image_path_abs}")
+    logging.info(f"📁 文件存在: {os.path.exists(image_path)}")
+    
     if not os.path.exists(image_path):
-        raise HTTPException(status_code=404, detail="图片不存在")
+        # 尝试不同的路径
+        alt_paths = [
+            os.path.join("backend", UPLOAD_DIR, "images", image_filename),
+            os.path.join("..", UPLOAD_DIR, "images", image_filename),
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", UPLOAD_DIR, "images", image_filename)
+        ]
+        
+        for alt_path in alt_paths:
+            logging.info(f"🔍 尝试路径: {os.path.abspath(alt_path)} - 存在: {os.path.exists(alt_path)}")
+            if os.path.exists(alt_path):
+                image_path = alt_path
+                break
+        else:
+            raise HTTPException(status_code=404, detail=f"图片不存在: {image_path_abs}")
+    
+    # 根据文件扩展名设置正确的media_type
+    if image_filename.lower().endswith('.png'):
+        media_type = "image/png"
+    elif image_filename.lower().endswith(('.jpg', '.jpeg')):
+        media_type = "image/jpeg"
+    else:
+        media_type = "image/png"  # 默认
     
     return FileResponse(
         path=image_path,
-        media_type="image/jpeg",  # 根据实际文件类型调整
+        media_type=media_type,
         headers={"Cache-Control": "max-age=3600"}
     )
 
@@ -767,4 +807,12 @@ async def questions_admin(request: Request, db: Session = Depends(get_db)):
         "type_distribution": type_distribution,
         "recent_extractions": recent_extractions,
         "ssr_questions": ssr_questions,
+    })
+
+@router.get("/admin/scoring-system", response_class=HTMLResponse)
+async def scoring_system_admin(request: Request):
+    """智能评分系统说明页面"""
+    
+    return templates.TemplateResponse("scoring_system_admin.html", {
+        "request": request
     })

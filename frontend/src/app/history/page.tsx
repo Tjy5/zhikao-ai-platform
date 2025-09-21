@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { API_BASE_URL } from "../../config/api";
+import Navigation from "../../components/Navigation";
 
 type HistoryItem = {
   id: string;
@@ -188,17 +189,20 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
-      <div className="max-w-6xl mx-auto">
-        {/* 页面标题 */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            历史记录
-          </h1>
-          <p className="text-gray-600">
-            查看您的申论批改历史，回顾学习轨迹
-          </p>
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      <Navigation />
+      
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
+        <div className="max-w-6xl mx-auto">
+          {/* 页面标题 */}
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-gray-800 mb-2">
+              📋 历史记录
+            </h1>
+            <p className="text-gray-600">
+              查看您的申论批改历史，回顾学习轨迹
+            </p>
+          </div>
 
         {/* 顶部操作区 */}
         <div className="mb-6 flex items-center justify-between">
@@ -729,6 +733,7 @@ export default function HistoryPage() {
               </>
             )}
           </div>
+        </div>
         </div>
       </div>
     </div>

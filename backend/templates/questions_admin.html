@@ -28,6 +28,40 @@
             overflow: hidden;
         }
 
+        .admin-nav {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .admin-nav a {
+            display: inline-block;
+            color: #495057;
+            text-decoration: none;
+            background: #f8f9fa;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin: 0 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+            font-weight: 500;
+            border: 1px solid #dee2e6;
+        }
+
+        .admin-nav a:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .admin-nav a.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-color: #667eea;
+        }
+
         .header {
             background: linear-gradient(45deg, #667eea, #764ba2);
             color: white;
@@ -459,10 +493,25 @@
                 padding: 12px;
             }
         }
+        
+        /* 状态颜色类 */
+        .text-success {
+            color: #28a745 !important;
+        }
+        
+        .text-danger {
+            color: #dc3545 !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- 管理员导航 -->
+        <div class="admin-nav">
+            <a href="/api/v1/questions/admin/dashboard" class="active">📚 题目库管理</a>
+            <a href="/api/v1/questions/admin/scoring-system">🧠 智能评分系统</a>
+        </div>
+        
         <!-- 头部 -->
         <div class="header">
             <h1>📚 题目库管理系统</h1>
@@ -496,6 +545,7 @@
                 <h3>📊 题型分布</h3>
                 <div class="type-distribution" id="typeDistribution"></div>
             </div>
+
 
             <!-- 题型清洗建议/原始类型 -->
             <div class="recent-extractions" id="typeInsightsBlock" style="display:none;">
@@ -545,7 +595,7 @@
                                 用时: {{ extraction.processing_time_seconds or 0 }}秒
                             </small>
                         </div>
-                        <div style="color: {{ '#28a745' if extraction.success else '#dc3545' }};">
+                        <div class="{{ 'text-success' if extraction.success else 'text-danger' }}">
                             {{ '✅ 成功' if extraction.success else '❌ 失败' }}
                         </div>
                     </div>
@@ -916,6 +966,7 @@
                         <div class="question-meta">
                             📝 图片数量: ${question.total_images || 0}张 | 
                             📄 段落范围: ${question.paragraph_range || '未知'} | 
+                            ${question.answer ? `✅ 答案: <span style="background: #4caf50; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px;">${question.answer}</span>` : '❌ 无答案'} | 
                             🕒 创建时间: ${question.created_at ? new Date(question.created_at).toLocaleString() : '未知'}
                         </div>
                         <div id="detail-${question.id}" class="question-detail" style="display: none; margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #667eea;">
@@ -1155,6 +1206,51 @@
                 </div>
             `;
             
+            // 显示答案和解析信息
+            if (questionData.answer || questionData.answer_explanation) {
+                html += `
+                    <div style="margin-bottom: 20px; padding: 15px; background: #e8f5e8; border-radius: 8px; border-left: 4px solid #4caf50;">
+                        <h5 style="color: #2e7d32; margin-bottom: 12px;">✅ 答案与解析</h5>
+                `;
+                
+                if (questionData.answer) {
+                    html += `
+                        <div style="margin-bottom: 10px;">
+                            <strong style="color: #2e7d32;">正确答案:</strong> 
+                            <span style="display: inline-block; background: #4caf50; color: white; padding: 4px 12px; border-radius: 15px; font-weight: bold; margin-left: 8px;">${questionData.answer}</span>
+                        </div>
+                    `;
+                }
+                
+                if (questionData.answer_explanation) {
+                    const explanation = questionData.answer_explanation.length > 200 ? 
+                        questionData.answer_explanation.substring(0, 200) + '...' : 
+                        questionData.answer_explanation;
+                    
+                    html += `
+                        <div style="margin-bottom: 10px;">
+                            <strong style="color: #2e7d32;">详细解析:</strong>
+                            <div style="margin-top: 8px; padding: 12px; background: white; border-radius: 6px; border: 1px solid #c8e6c9; line-height: 1.6;">
+                                <div class="explanation-preview" style="color: #333;">${explanation}</div>
+                                ${questionData.answer_explanation.length > 200 ? `
+                                    <div class="explanation-full" style="display: none; color: #333;">${questionData.answer_explanation}</div>
+                                    <button onclick="toggleExplanation(this)" style="margin-top: 8px; background: #4caf50; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">查看完整解析</button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                html += `</div>`;
+            } else {
+                html += `
+                    <div style="margin-bottom: 20px; padding: 15px; background: #fff3e0; border-radius: 8px; border-left: 4px solid #ff9800;">
+                        <h5 style="color: #f57c00; margin-bottom: 8px;">⚠️ 答案信息</h5>
+                        <p style="color: #ef6c00; margin: 0;">此题目暂无答案和解析信息</p>
+                    </div>
+                `;
+            }
+            
             // 材料图片优先展示
             if (materialImgs.length > 0) {
                 html += `
@@ -1311,6 +1407,23 @@
             }).catch(() => {
                 showAlert('复制失败', 'error');
             });
+        }
+
+        // 切换解析显示
+        function toggleExplanation(button) {
+            const container = button.closest('div');
+            const preview = container.querySelector('.explanation-preview');
+            const full = container.querySelector('.explanation-full');
+            
+            if (preview.style.display === 'none') {
+                preview.style.display = 'block';
+                full.style.display = 'none';
+                button.textContent = '查看完整解析';
+            } else {
+                preview.style.display = 'none';
+                full.style.display = 'block';
+                button.textContent = '收起解析';
+            }
         }
 
         // 显示清空题库对话框
