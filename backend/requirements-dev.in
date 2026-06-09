@@ -1,0 +1,18 @@
+# 开发/测试依赖输入文件，会自动包含运行时依赖
+-r requirements.in
+
+# 测试
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# 质量工具
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.5.0
+pre-commit>=3.0.0
+
+# 依赖治理/安全
+pip-tools>=7.4.0
+pip-audit>=2.7.0
