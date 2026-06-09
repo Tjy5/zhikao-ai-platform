@@ -1,0 +1,27 @@
+{
+  "item_id": "writing-community-service-001",
+  "item_type": "writing_task",
+  "title": "Community Service Writing Task",
+  "license": "CC-BY-4.0",
+  "copyright_holder": "Tjy5 contributors",
+  "origin_policy": "original_only",
+  "review_status": "approved",
+  "source_refs": [],
+  "originality_declaration": "Created from scratch for this repository; not derived from a real exam or online writing prompt.",
+  "body": {
+    "scenario": "A neighborhood service station plans to combine appointment guidance, elder-friendly assistance, and feedback collection into one routine service process.",
+    "prompt": "Write an analysis and proposal for improving the service process. Focus on resident needs, operational feasibility, and feedback loops.",
+    "suggested_structure": [
+      "Identify the service problem.",
+      "Explain why the problem matters.",
+      "Propose concrete process improvements.",
+      "Describe how to evaluate the result."
+    ],
+    "evaluation_dimensions": [
+      "problem awareness",
+      "public-service reasoning",
+      "structure",
+      "language clarity"
+    ]
+  }
+}

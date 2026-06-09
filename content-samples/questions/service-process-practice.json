@@ -1,0 +1,34 @@
+{
+  "item_id": "practice-service-process-001",
+  "item_type": "practice_question",
+  "title": "Service Process Practice",
+  "license": "CC-BY-4.0",
+  "copyright_holder": "Tjy5 contributors",
+  "origin_policy": "original_only",
+  "review_status": "approved",
+  "source_refs": [],
+  "originality_declaration": "Created from scratch for this repository; not derived from a real exam or online question bank.",
+  "body": {
+    "stem": "A district service office wants to reduce repeated form filling for residents. Which action best reflects a service-oriented improvement?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Ask residents to submit the same identity information at every step."
+      },
+      {
+        "key": "B",
+        "text": "Merge repeated fields, show progress clearly, and keep necessary review points."
+      },
+      {
+        "key": "C",
+        "text": "Move every request to offline counters to avoid system changes."
+      },
+      {
+        "key": "D",
+        "text": "Publish only internal processing rules and remove public status updates."
+      }
+    ],
+    "answer_key": "B",
+    "explanation": "The best option improves usability while preserving necessary review. The exercise is an original platform sample, not a copied exam item."
+  }
+}

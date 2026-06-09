@@ -1,0 +1,26 @@
+{
+  "item_id": "knowledge-copyright-boundary-001",
+  "item_type": "knowledge_point",
+  "title": "Copyright Boundary Basics",
+  "license": "CC-BY-4.0",
+  "copyright_holder": "Tjy5 contributors",
+  "origin_policy": "official_source_based",
+  "review_status": "approved",
+  "source_refs": [
+    {
+      "type": "law",
+      "title": "Copyright Law of the People's Republic of China",
+      "url": "https://www.ncac.gov.cn/xxfb/flfg/flfg_532/202103/t20210309_50530.html"
+    }
+  ],
+  "originality_declaration": "Original explanatory writing based on an official legal source; no third-party course material or question-bank content is included.",
+  "body": {
+    "summary": "Public learning content can safely start from official legal texts, public facts, and original analysis. The platform should still avoid copying third-party explanations, examples, and teaching material.",
+    "learning_points": [
+      "Official legal and administrative documents can be referenced as source material, but platform explanations should be written independently.",
+      "Mere factual information can support a knowledge point, while creative expression around those facts may still carry rights.",
+      "A content item should record its source and origin policy so reviewers can audit why it belongs in the public repository."
+    ],
+    "review_prompt": "When reviewing a knowledge item, separate source facts from the author's explanatory expression."
+  }
+}

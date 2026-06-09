@@ -1,0 +1,34 @@
+{
+  "item_id": "practice-public-communication-001",
+  "item_type": "practice_question",
+  "title": "Public Communication Practice",
+  "license": "CC-BY-4.0",
+  "copyright_holder": "Tjy5 contributors",
+  "origin_policy": "original_only",
+  "review_status": "approved",
+  "source_refs": [],
+  "originality_declaration": "Created from scratch for this repository; not derived from a real exam or online question bank.",
+  "body": {
+    "stem": "A public notice uses technical terms that many readers do not understand. Which revision is most appropriate?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Keep the technical terms and remove examples."
+      },
+      {
+        "key": "B",
+        "text": "Replace all details with slogans."
+      },
+      {
+        "key": "C",
+        "text": "Explain key terms in plain language and keep the operational steps visible."
+      },
+      {
+        "key": "D",
+        "text": "Delay publication until every possible question has been predicted."
+      }
+    ],
+    "answer_key": "C",
+    "explanation": "Clear public communication should preserve accuracy while making the action path understandable. The exercise was written for this repository."
+  }
+}

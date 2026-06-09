@@ -2,6 +2,8 @@
 
 墨评AI 是一个基于 React、Vite、FastAPI 和 OpenAI-compatible LLM 的写作反馈应用。当前保留的产品面聚焦四件事：注册/登录、提交写作作答、保存自己的模型设置、回看历史记录。
 
+本仓库正在向可开源的公考学习平台核心演进。公开仓库不保存未授权题库、真题解析、培训资料或本地私有语料；知识点、原创练习和写作任务通过可审计的内容包机制逐步加入。
+
 ## 核心功能
 
 - **首页**：展示墨评AI产品入口、写作反馈入口、历史记录入口和设置入口。
@@ -9,6 +11,7 @@
 - **写作反馈**：支持传统评分接口和两阶段渐进式评分接口，生产请求需要登录并使用当前账号的模型设置。
 - **历史记录**：保存当前账号的批改请求与结果，支持列表、筛选、详情和清空。
 - **AI 状态检查**：展示当前账号的非秘密 LLM 配置状态，未配置或调用失败时回退到本地规则评分。
+- **内容治理**：通过内容包 manifest、来源声明、许可证声明和后端校验器管理公开示例内容。
 
 ## 快速开始
 
@@ -43,8 +46,28 @@ writing-feedback-platform/
 │   ├── app/models/            # 当前 SQLAlchemy 模型
 │   ├── app/services/          # AI、历史和文本处理服务
 │   └── alembic/               # 数据库迁移
+├── content-samples/           # 原创/官方来源示例内容包，不含真题或网课材料
 └── docs/                      # 当前保留文档
 ```
+
+## 内容治理
+
+公开内容必须遵守：
+
+- [CONTENT_POLICY.md](CONTENT_POLICY.md)：公开内容边界、禁止内容、官方来源和许可证依据。
+- [CONTRIBUTING_CONTENT.md](CONTRIBUTING_CONTENT.md)：内容贡献格式、来源策略和审核状态。
+- [ATTRIBUTIONS.md](ATTRIBUTIONS.md)：公开内容和许可证归属记录。
+- [TAKEDOWN.md](TAKEDOWN.md)：权利投诉和移除流程。
+
+本仓库的公开 demo 内容位于 `content-samples/`，只包含原创示例和基于官方来源的原创说明，不包含真实试题、官方答案解析、网上题库、培训课程材料或旧本地私有内容。
+
+校验内容包：
+
+```powershell
+python backend/scripts/validate_content_packs.py
+```
+
+新增内容包时必须提供 `manifest.json`，并为每个内容项声明 `license`、`origin_policy`、`review_status`、`source_refs` 或 `originality_declaration`。
 
 ## 配置
 
@@ -109,6 +132,7 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8001
 pytest
 python scripts/quick_import.py
+python scripts/validate_content_packs.py
 
 # 前端
 cd frontend
@@ -123,7 +147,8 @@ npm run build
 - 仓库只保留本文件作为唯一 `README.md` 入口，避免多个 README 内容分叉。
 - 后端依赖升级应先修改 `backend/requirements.in` 或 `backend/requirements-dev.in`，再在 `backend/` 下运行 `make lock`、`make pip-audit` 和相关测试。
 - 数据库仅使用 SQLite，默认文件为 `backend/dev.db`。
-- 后端维护脚本当前仅保留 `backend/scripts/quick_import.py`，用于轻量检查 `app.main` 能否成功导入。
+- 后端维护脚本包括 `backend/scripts/quick_import.py` 和 `backend/scripts/validate_content_packs.py`。
+- 新增公开学习内容前，先运行内容包校验，确认没有缺失来源声明、未知许可证、私有路径或旧内容痕迹。
 - 确需新增长期文档时再创建 `docs/`，并从本 README 链接；临时调研和阶段报告默认不入库。
 
 ## 本地验收

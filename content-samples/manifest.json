@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0",
+  "pack_id": "open-civil-service-demo",
+  "title": "Open Civil Service Demo Content Pack",
+  "description": "Original and official-source-based sample content for developing the public platform without using real exam materials.",
+  "version": "0.1.0",
+  "license": "CC-BY-4.0",
+  "copyright_holder": "Tjy5 contributors",
+  "origin_policy": "mixed_with_review",
+  "review_status": "approved",
+  "items": [
+    {
+      "path": "knowledge/copyright-boundary-basics.json",
+      "item_id": "knowledge-copyright-boundary-001",
+      "item_type": "knowledge_point",
+      "title": "Copyright Boundary Basics",
+      "license": "CC-BY-4.0",
+      "origin_policy": "official_source_based",
+      "review_status": "approved",
+      "source_refs": [
+        {
+          "type": "law",
+          "title": "Copyright Law of the People's Republic of China",
+          "url": "https://www.ncac.gov.cn/xxfb/flfg/flfg_532/202103/t20210309_50530.html"
+        }
+      ]
+    },
+    {
+      "path": "knowledge/government-information-boundaries.json",
+      "item_id": "knowledge-government-information-001",
+      "item_type": "knowledge_point",
+      "title": "Government Information Boundaries",
+      "license": "CC-BY-4.0",
+      "origin_policy": "official_source_based",
+      "review_status": "approved",
+      "source_refs": [
+        {
+          "type": "regulation",
+          "title": "Regulation on the Disclosure of Government Information",
+          "url": "https://www.most.gov.cn/xxgk/xinxifenlei/zfxxgkzd/202005/t20200527_156016.html"
+        }
+      ]
+    },
+    {
+      "path": "questions/service-process-practice.json",
+      "item_id": "practice-service-process-001",
+      "item_type": "practice_question",
+      "title": "Service Process Practice",
+      "license": "CC-BY-4.0",
+      "origin_policy": "original_only",
+      "review_status": "approved",
+      "originality_declaration": "Created from scratch for this repository; not derived from a real exam or online question bank."
+    },
+    {
+      "path": "questions/public-communication-practice.json",
+      "item_id": "practice-public-communication-001",
+      "item_type": "practice_question",
+      "title": "Public Communication Practice",
+      "license": "CC-BY-4.0",
+      "origin_policy": "original_only",
+      "review_status": "approved",
+      "originality_declaration": "Created from scratch for this repository; not derived from a real exam or online question bank."
+    },
+    {
+      "path": "writing-tasks/community-service-writing.json",
+      "item_id": "writing-community-service-001",
+      "item_type": "writing_task",
+      "title": "Community Service Writing Task",
+      "license": "CC-BY-4.0",
+      "origin_policy": "original_only",
+      "review_status": "approved",
+      "originality_declaration": "Created from scratch for this repository; not derived from a real exam or online writing prompt."
+    },
+    {
+      "path": "writing-tasks/digital-service-writing.json",
+      "item_id": "writing-digital-service-001",
+      "item_type": "writing_task",
+      "title": "Digital Service Writing Task",
+      "license": "CC-BY-4.0",
+      "origin_policy": "original_only",
+      "review_status": "approved",
+      "originality_declaration": "Created from scratch for this repository; not derived from a real exam or online writing prompt."
+    }
+  ]
+}

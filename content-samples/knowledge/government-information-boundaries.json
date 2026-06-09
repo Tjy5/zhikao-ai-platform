@@ -1,0 +1,26 @@
+{
+  "item_id": "knowledge-government-information-001",
+  "item_type": "knowledge_point",
+  "title": "Government Information Boundaries",
+  "license": "CC-BY-4.0",
+  "copyright_holder": "Tjy5 contributors",
+  "origin_policy": "official_source_based",
+  "review_status": "approved",
+  "source_refs": [
+    {
+      "type": "regulation",
+      "title": "Regulation on the Disclosure of Government Information",
+      "url": "https://www.most.gov.cn/xxgk/xinxifenlei/zfxxgkzd/202005/t20200527_156016.html"
+    }
+  ],
+  "originality_declaration": "Original explanatory writing based on an official regulation; no third-party course material or question-bank content is included.",
+  "body": {
+    "summary": "Government information work balances openness with security, privacy, third-party rights, and administrative process needs. Platform content should model that balance instead of treating every public-sector document as reusable training material.",
+    "learning_points": [
+      "Public access is a default policy direction, but disclosure has defined exceptions.",
+      "Sensitive categories such as state secrets, personal privacy, trade secrets, internal affairs, and process records require extra caution.",
+      "For platform content, source review should check both public availability and reuse suitability."
+    ],
+    "review_prompt": "Before using a government source, confirm that the material is public, relevant, and not copied as a protected explanatory work."
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "item_id": "writing-digital-service-001",
+  "item_type": "writing_task",
+  "title": "Digital Service Writing Task",
+  "license": "CC-BY-4.0",
+  "copyright_holder": "Tjy5 contributors",
+  "origin_policy": "original_only",
+  "review_status": "approved",
+  "source_refs": [],
+  "originality_declaration": "Created from scratch for this repository; not derived from a real exam or online writing prompt.",
+  "body": {
+    "scenario": "A city department is introducing an online service dashboard. Some residents welcome faster processing, while others worry about accessibility and data clarity.",
+    "prompt": "Write a balanced proposal for launching the dashboard. Address digital access, transparent status information, and offline support.",
+    "suggested_structure": [
+      "Summarize the opportunity and risk.",
+      "State principles for inclusive service.",
+      "Recommend launch steps.",
+      "Set measurable follow-up indicators."
+    ],
+    "evaluation_dimensions": [
+      "balanced judgment",
+      "policy implementation",
+      "specific measures",
+      "coherent expression"
+    ]
+  }
+}
