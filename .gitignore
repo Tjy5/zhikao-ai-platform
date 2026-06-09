@@ -226,6 +226,9 @@ temp.txt
 dev.db
 backend/dev.db
 
+# Java backend build output
+backend/target/
+
 # Upload outputs
 backend/uploads/
 

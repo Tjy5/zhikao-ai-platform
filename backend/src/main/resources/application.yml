@@ -1,0 +1,32 @@
+server:
+  port: ${BACKEND_PORT:${PORT:8001}}
+
+spring:
+  application:
+    name: zhikao-backend
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    url: ${JDBC_DATABASE_URL:jdbc:sqlite:./dev.db}
+    hikari:
+      maximum-pool-size: 1
+      connection-init-sql: PRAGMA foreign_keys=ON
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    default-property-inclusion: non_null
+
+app:
+  debug: ${DEBUG:false}
+  cors-origins: ${BACKEND_CORS_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+  secret-key: ${APP_SECRET_KEY:dev-only-change-me}
+  access-token-expire-minutes: ${ACCESS_TOKEN_EXPIRE_MINUTES:60}
+  model-settings-encryption-key: ${MODEL_SETTINGS_ENCRYPTION_KEY:dev-only-model-settings-key-change-me}
+  openai-api-key: ${OPENAI_API_KEY:}
+  openai-api-base: ${OPENAI_API_BASE:https://api.openai.com/v1}
+  openai-model-name: ${OPENAI_MODEL_NAME:gpt-4o-mini}
+  writing-llm-json-fallback: ${WRITING_LLM_JSON_FALLBACK:true}
+
+logging:
+  level:
+    root: INFO
