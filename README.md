@@ -4,6 +4,21 @@
 
 本仓库正在向可开源的公考学习平台核心演进。公开仓库不保存未授权题库、真题解析、培训资料或本地私有语料；知识点、原创练习和写作任务通过可审计的内容包机制逐步加入。
 
+## 简历项目定位
+
+这个仓库适合按 **AI 应用工程 / 全栈 AI 产品工程** 项目展示，而不是按普通 CRUD 项目展示。核心亮点是：
+
+- 端到端产品闭环：注册登录、用户级模型配置、写作提交、SSE 批改、历史复盘和设置管理。
+- AI 应用工程边界：OpenAI-compatible provider、模型发现、provider 测试、JSON 兜底开关、失败分类和离线输出合同回归。
+- 安全和隐私边界：BCrypt 密码哈希、HS256 JWT、用户隔离、provider API key 加密保存和响应脱敏。
+- 工程质量证据：Spring Boot contract tests、前端 Vitest 流程测试、内容包治理测试、离线写作反馈 eval fixture、GitHub Actions CI。
+
+可以在简历中概括为：
+
+```text
+构建 React + Spring Boot 全栈 AI 写作反馈平台，支持 JWT 登录、用户级 OpenAI-compatible 模型配置、API key 加密保存、SSE 渐进式批改、历史复盘、内容包治理和离线 LLM 输出合同回归；通过 JUnit/MockMvc、Vitest 和 GitHub Actions 覆盖核心质量门禁。
+```
+
 ## 核心功能
 
 - **首页**：展示墨评AI产品入口、写作反馈入口、历史记录入口和设置入口。
@@ -12,6 +27,7 @@
 - **历史记录**：保存当前账号的批改请求与结果，支持列表、筛选、详情和清空。
 - **AI 状态检查**：展示当前账号的非秘密 LLM 配置状态，不暴露用户 provider API key。
 - **内容治理**：通过内容包 manifest、来源声明、许可证声明和 Java 后端校验器管理公开示例内容。
+- **离线 AI 回归**：用原创写作任务和确定性 Markdown fixture 校验反馈结构、rubric 覆盖和可执行建议，不依赖真实 LLM key。
 
 ## 快速开始
 
@@ -40,6 +56,38 @@
 - AI provider：小型 OpenAI-compatible HTTP wrapper，支持 `/chat/completions` 和 `/models`。
 - 测试：Vitest、Testing Library、JUnit 5、Spring Boot Test、MockMvc。
 
+## 架构和请求流
+
+```text
+React/Vite SPA
+  ├─ AuthProvider + RequireAuth 管理登录态和受保护页面
+  ├─ apiClient 统一封装 REST API，SSE 批改保留 raw Response
+  └─ writing/history/settings 页面消费用户级 API
+        │
+        ▼
+Spring Boot API (/api/v1)
+  ├─ auth: 注册、登录、/me、JWT 签发和校验
+  ├─ settings: 用户级 provider base URL、模型名、API key 加密保存
+  ├─ writing: 同步批改、SSE 批改、AI 状态、历史列表和详情
+  ├─ ai: OpenAI-compatible HTTP provider、prompt builder、失败分类
+  ├─ content: 公开内容包校验器和 CLI
+  └─ data: JdbcClient repositories + SQLite/Flyway schema
+        │
+        ▼
+SQLite dev.db
+  ├─ users
+  ├─ user_ai_model_settings
+  └─ history
+```
+
+核心流程：
+
+1. **登录认证**：前端提交 `/api/v1/auth/login`，后端签发 HS256 JWT，前端通过 `authSession` 自动附加 `Authorization: Bearer <token>`。
+2. **模型配置**：用户在 `/settings` 保存 OpenAI-compatible base URL、模型名和 API key。后端只保存 AES-GCM 加密后的 key，并返回 `has_api_key` 和 `api_key_hint`。
+3. **SSE 批改**：写作页调用 `/api/v1/writings/grade-progressive`，后端加载当前用户配置，调用 provider，成功时发送一个最终 `text/event-stream` 事件，失败时发送带 `classification` 和 `retryable` 的错误事件。
+4. **历史复盘**：批改成功后写入 `history`，历史页只查询当前登录用户的数据，避免跨用户泄漏。
+5. **内容治理**：公开示例内容必须通过 manifest、来源策略、许可证和审查状态校验，避免仓库混入真实试题、私有语料或培训材料。
+
 ## 项目结构
 
 ```text
@@ -55,7 +103,8 @@ writing-feedback-platform/
 │   ├── mvnw / mvnw.cmd        # Maven wrapper
 │   ├── src/main/java/         # API、服务、数据访问、安全和内容校验
 │   ├── src/main/resources/    # application.yml 和 Flyway 迁移
-│   └── src/test/java/         # JUnit / MockMvc 回归测试
+│   └── src/test/              # JUnit / MockMvc / 离线 AI 输出合同回归测试
+├── .github/workflows/ci.yml   # 后端和前端质量门禁
 ├── content-samples/           # 原创/官方来源示例内容包，不含真题或网课材料
 └── docs/                      # 当前保留文档
 ```
@@ -108,6 +157,17 @@ VITE_DEBUG=false
 
 受保护接口包括 `/api/v1/auth/me`、`/api/v1/writings/**` 和 `/api/v1/settings/writing-ai/**`。这些接口都需要 `Authorization: Bearer <token>`。
 
+## AI 工程证据
+
+本项目刻意把 AI 能力放在可测试边界内，而不是只在前端包一层模型调用。
+
+- **Provider 抽象**：`AiProvider` 定义写作批改和模型发现接口，生产实现是 `OpenAiCompatibleAiProvider`，测试使用 `FakeAiProvider`，避免测试访问真实外部服务。
+- **失败分类**：provider 错误被归类为 `unavailable`、`authentication`、`timeout`、`rate_limit`、`refusal`、`malformed_output`、`provider_error` 和 `unknown`，同步接口和 SSE 接口都返回安全的用户可读结果。
+- **离线输出合同回归**：`backend/src/test/resources/eval/writing-feedback-benchmark.json` 保存原创写作任务的正负样例，`WritingFeedbackEvalTests` 校验 Markdown 反馈必须包含任务类型、综合评价、亮点、改进建议、参考优化、rubric 维度和可执行建议。
+- **密钥治理**：用户 provider API key 不进入前端持久化配置，不以明文落库，不在响应中返回。
+
+离线 eval 的边界是输出合同回归，不声称真实模型评分准确率。它证明项目已经定义“什么样的 AI 反馈算可用”，并能在 CI 中阻止明显退化的反馈格式。
+
 ## 内容治理
 
 公开内容必须遵守：
@@ -137,48 +197,67 @@ cd backend
 
 ```powershell
 # 后端测试
-cd backend
-.\mvnw.cmd test
+Push-Location backend; .\mvnw.cmd test; Pop-Location
+
+# 后端离线 LLM 输出合同回归，已包含在 test 内
+Push-Location backend; .\mvnw.cmd -Dtest=WritingFeedbackEvalTests test; Pop-Location
 
 # 后端开发启动
-cd backend
-.\dev.ps1 -Port 8001
+Push-Location backend; .\dev.ps1 -Port 8001; Pop-Location
 
 # 后端打包
-cd backend
-.\mvnw.cmd package
+Push-Location backend; .\mvnw.cmd package; Pop-Location
 
 # 内容包校验
-cd backend
-.\mvnw.cmd -q '-DskipTests' 'exec:java' '-Dexec.args=..\content-samples'
+Push-Location backend; .\mvnw.cmd -q '-DskipTests' 'exec:java' '-Dexec.args=..\content-samples'; Pop-Location
 ```
 
 ```bash
 # 后端测试
-cd backend
-./mvnw test
+(cd backend && ./mvnw test)
+
+# 后端离线 LLM 输出合同回归，已包含在 test 内
+(cd backend && ./mvnw -Dtest=WritingFeedbackEvalTests test)
 
 # 后端开发启动
-cd backend
-./dev.sh
+(cd backend && ./dev.sh)
 
 # 后端打包
-cd backend
-./mvnw package
+(cd backend && ./mvnw package)
 
 # 内容包校验
-cd backend
-./mvnw -q -DskipTests exec:java -Dexec.args="../content-samples"
+(cd backend && ./mvnw -q -DskipTests exec:java -Dexec.args="../content-samples")
 ```
 
 ```bash
 # 前端
-cd frontend
-npm install
-npm run dev
-npm run test
+(cd frontend && npm install)
+(cd frontend && npm run dev)
+(cd frontend && npm run lint)
+(cd frontend && npm run test)
+(cd frontend && npm run build)
+```
+
+## 质量门禁和 CI
+
+本地质量门禁：
+
+```powershell
+cd backend
+.\mvnw.cmd test
+
+cd ..\frontend
+npm run lint
+npm test
 npm run build
 ```
+
+GitHub Actions workflow 位于 `.github/workflows/ci.yml`，包含两个 secret-free job：
+
+- **Backend tests**：Ubuntu runner + Java 21 + Maven wrapper + `./mvnw test`。这会同时运行 MockMvc contract tests、内容包测试和离线写作反馈 eval。
+- **Frontend checks**：Ubuntu runner + Node 20 + `npm ci` + `npm run lint` + `npm test` + `npm run build`。
+
+CI 不依赖真实 provider API key，不会访问 OpenAI-compatible 外部服务。
 
 ## 数据库
 
@@ -194,6 +273,24 @@ npm run build
 - `APP_SECRET_KEY` 每个部署环境必须独立设置；更换该值会让已签发 token 失效。
 - `MODEL_SETTINGS_ENCRYPTION_KEY` 必须和数据库备份一起纳入密钥备份流程；丢失后，已保存的用户 provider API key 无法解密，只能让用户重新填写。
 - 用户 provider API key 只应通过 `/settings` 保存，不要写入前端 `.env.local`、浏览器存储或提交到仓库。
+
+## 面试讲法
+
+可以重点讲这些工程问题：
+
+- **为什么用 SSE**：写作批改可能耗时较长，SSE 给前端保留渐进式反馈通道；当前实现先发送单个最终事件，未来可以扩展为多阶段进度事件而不改变页面入口。
+- **怎么避免薄 LLM wrapper**：项目把 provider 配置、密钥加密、失败分类、模型发现、provider 测试、历史记录和离线输出合同回归纳入系统边界。
+- **怎么做用户隔离**：后端从 JWT principal 获取 `user_id`，settings/history 查询都按当前用户过滤，客户端不能传入任意用户 ID 访问数据。
+- **怎么处理 AI 失败**：provider failure 被映射为分类、HTTP 状态、retryable 标记和用户消息，SSE 错误事件不会被前端误当成成功结果。
+- **怎么处理公开内容风险**：内容包要求 manifest、许可证、来源策略和审查状态，校验器阻止真实试题、私有语料和旧本地痕迹进入公开 demo。
+- **下一步如何演进**：可以继续加 token/cost/latency 观测、请求限流、eval 报告趋势、线上部署和更细的学习进度模型。
+
+诚实限制：
+
+- 当前没有公开生产部署和真实用户数据，不能在简历中写用户数、可用性或真实延迟指标。
+- 离线 eval 只校验输出结构和基本可用性，不代表真实模型评分准确率。
+- SQLite 适合本地开发和轻量 demo，生产多人高并发场景需要重新评估数据库和连接池策略。
+- 当前 SSE 成功路径发送一个最终事件，不是完整 token-by-token 流式输出。
 
 ## 维护说明
 
@@ -213,4 +310,4 @@ npm run build
 6. 打开 `/history`，确认只看到当前账号的记录并可查看详情。
 7. 退出登录后再访问 `/writing`、`/history` 和 `/settings`，应回到登录流程。
 
-**最后更新**：2026-06-09
+**最后更新**：2026-06-10
