@@ -10,6 +10,7 @@ interface NavigationLocation {
 
 const retainedRouteTopNavItems = [
   { label: '学习首页', href: '/' },
+  { label: '申论学习', href: '/shenlun-study' },
   { label: '申论批改', href: '/writing' },
   { label: '复盘档案', href: '/history' },
   { label: '模型设置', href: '/settings' },

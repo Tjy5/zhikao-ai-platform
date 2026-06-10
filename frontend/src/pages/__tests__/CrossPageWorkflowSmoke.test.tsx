@@ -69,6 +69,14 @@ describe('retained route smoke and fallback route handling', () => {
     );
 
     cleanup();
+    renderRoute('/shenlun-study');
+    expect(
+      await screen.findByRole('heading', { level: 1, name: '申论学习' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('五类题不背模板，背判断')).toBeInTheDocument();
+    expect(screen.getByText('范围、内容、要求')).toBeInTheDocument();
+
+    cleanup();
     renderRoute('/writing');
     expect(
       await screen.findByRole('heading', { name: '登录' })

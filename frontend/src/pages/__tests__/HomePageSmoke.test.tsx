@@ -55,6 +55,7 @@ describe('home page smoke test', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('AI 驱动的公考备考工作台')).toBeInTheDocument();
     expect(screen.getAllByText('学习首页').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('申论学习').length).toBeGreaterThan(0);
     expect(screen.getAllByText('申论批改').length).toBeGreaterThan(0);
     expect(screen.getAllByText('复盘档案').length).toBeGreaterThan(0);
     expect(screen.getAllByText('模型设置').length).toBeGreaterThan(0);
@@ -140,12 +141,14 @@ describe('home page smoke test', () => {
     );
     expect(navLinks.map(link => link.textContent)).toEqual([
       '学习首页',
+      '申论学习',
       '申论批改',
       '复盘档案',
       '模型设置',
     ]);
     expect(navLinks.map(link => link.getAttribute('href'))).toEqual([
       '/',
+      '/shenlun-study',
       '/writing',
       '/history',
       '/settings',
@@ -155,7 +158,13 @@ describe('home page smoke test', () => {
       .getAllByRole('link')
       .map(link => link.getAttribute('href'));
     expect(hrefs).toEqual(
-      expect.arrayContaining(['/', '/writing', '/history', '/settings'])
+      expect.arrayContaining([
+        '/',
+        '/shenlun-study',
+        '/writing',
+        '/history',
+        '/settings',
+      ])
     );
     expect(hrefs).not.toEqual(
       expect.arrayContaining(['#process', '#features'])

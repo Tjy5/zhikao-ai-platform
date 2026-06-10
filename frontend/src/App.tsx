@@ -6,6 +6,7 @@ import { AuthProvider } from './auth/AuthContext';
 import HomePage from './app/page';
 import WritingPage from './pages/WritingPage';
 import HistoryPage from './pages/HistoryPage';
+import ShenlunStudyPage from './pages/ShenlunStudyPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import SettingsPage from './pages/settings/SettingsPage';
@@ -43,6 +44,7 @@ export default function App() {
         <div className='min-h-screen bg-background text-foreground'>
           <Routes>
             <Route path='/' element={<HomePage />} />
+            <Route path='/shenlun-study' element={<ShenlunStudyPage />} />
             <Route path='/login' element={<LoginPage />} />
             <Route path='/register' element={<RegisterPage />} />
             <Route

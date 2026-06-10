@@ -98,12 +98,14 @@ describe('WritingPage', () => {
     );
     expect(navLinks.map(link => link.textContent)).toEqual([
       '学习首页',
+      '申论学习',
       '申论批改',
       '复盘档案',
       '模型设置',
     ]);
     expect(navLinks.map(link => link.getAttribute('href'))).toEqual([
       '/',
+      '/shenlun-study',
       '/writing',
       '/history',
       '/settings',

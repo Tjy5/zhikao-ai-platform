@@ -11,7 +11,7 @@ const chromePath =
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const routes = ['/', '/writing', '/history', '/settings'];
+const routes = ['/', '/shenlun-study', '/writing', '/history', '/settings'];
 
 const authenticatedRoutes = new Set(['/writing', '/history']);
 
@@ -42,7 +42,7 @@ const smokeHistoryItems = [
 
 const authenticatedRouteMarkers = {
   '/writing': ['输入区域', '开始AI批改', '批改结果'],
-  '/history': ['历史复盘', '最近记录', '评分明细'],
+  '/history': ['复盘档案', '最近记录', '评分明细'],
 };
 
 const unknownRoutes = [
