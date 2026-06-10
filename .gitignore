@@ -205,6 +205,7 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
+.github/
 .secrets/
 .secrets.example/
 *.tmp
