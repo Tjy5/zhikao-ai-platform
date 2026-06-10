@@ -14,7 +14,7 @@ function NotFoundPage() {
   return (
     <InkWashShell
       tone='fallback'
-      title='墨评AI'
+      title='智考AI'
       context='页面未找到'
       description='页面未找到，请从导航选择入口或返回首页继续学习。'
     >
@@ -29,7 +29,7 @@ function NotFoundPage() {
           to='/writing'
           className='ink-hover inline-flex items-center justify-center gap-2 rounded-[6px] border border-ink-light/25 bg-paper-rice/82 px-5 py-3 font-kaishu text-base text-ink transition hover:bg-paper'
         >
-          开始写作反馈
+          开始申论批改
         </Link>
       </div>
     </InkWashShell>

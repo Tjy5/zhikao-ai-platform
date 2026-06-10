@@ -7,7 +7,7 @@ const meta: Meta<EmptyStateProps> = {
   component: EmptyState,
   args: {
     title: '暂无数据',
-    description: '提交一篇写作后，这里将展示批改结果与历史记录。',
+    description: '提交一次申论作答后，这里将展示批改结果与复盘档案。',
   },
 };
 
@@ -21,7 +21,7 @@ export const WithAction: Story = {
   args: {
     action: (
       <button className='rounded-md border border-ink bg-ink px-4 py-2 text-sm font-semibold text-paper shadow-sm hover:bg-ink-light'>
-        去批改
+        去批改申论
       </button>
     ),
   },

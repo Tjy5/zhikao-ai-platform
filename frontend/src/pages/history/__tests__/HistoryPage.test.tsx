@@ -29,8 +29,7 @@ const rawWritingItem = {
   timestamp: '2026-01-01T08:00:00Z',
   type: 'writing',
   taskType: 'analysis',
-  content:
-    '# 写作反馈结果\n\n## 综合评价\n- 立意明确\n- 建议补充基层治理案例',
+  content: '# 写作反馈结果\n\n## 综合评价\n- 立意明确\n- 建议补充基层治理案例',
   contentFormat: 'markdown',
 };
 
@@ -149,15 +148,21 @@ describe('HistoryPage', () => {
 
     renderPage();
 
-    expect(await screen.findByText(displayId(rawWritingItem.id))).toBeInTheDocument();
-    expect(screen.getByText(displayId(legacyWritingItem.id))).toBeInTheDocument();
+    expect(
+      await screen.findByText(displayId(rawWritingItem.id))
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(displayId(legacyWritingItem.id))
+    ).toBeInTheDocument();
     expect(screen.getByText('58.0分')).toBeInTheDocument();
     expect(screen.getByText('请选择记录查看详情')).toBeInTheDocument();
 
     await user.click(screen.getByText(displayId(rawWritingItem.id)));
     const rawHeading = await screen.findByText('AI 原始批改结果');
     expect(rawHeading).toBeInTheDocument();
-    const detailPanel = rawHeading.closest('.history-detail-panel') as HTMLElement;
+    const detailPanel = rawHeading.closest(
+      '.history-detail-panel'
+    ) as HTMLElement;
     expect(within(detailPanel).getByText('综合评价')).toBeInTheDocument();
     expect(within(detailPanel).getByText('任务类型')).toBeInTheDocument();
     expect(within(detailPanel).getByText('markdown')).toBeInTheDocument();
@@ -187,13 +192,24 @@ describe('HistoryPage', () => {
     );
 
     expect(screen.getByText(displayId(rawWritingItem.id))).toBeInTheDocument();
-    expect(screen.queryByText(displayId(legacyWritingItem.id))).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(displayId(legacyWritingItem.id))
+    ).not.toBeInTheDocument();
 
-    await user.clear(screen.getByPlaceholderText('搜索 ID、类型、任务类型或内容...'));
-    await user.selectOptions(screen.getAllByRole('combobox')[1], 'format-writing');
+    await user.clear(
+      screen.getByPlaceholderText('搜索 ID、类型、任务类型或内容...')
+    );
+    await user.selectOptions(
+      screen.getAllByRole('combobox')[1],
+      'format-writing'
+    );
 
-    expect(screen.queryByText(displayId(rawWritingItem.id))).not.toBeInTheDocument();
-    expect(screen.getByText(displayId(legacyWritingItem.id))).toBeInTheDocument();
+    expect(
+      screen.queryByText(displayId(rawWritingItem.id))
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(displayId(legacyWritingItem.id))
+    ).toBeInTheDocument();
   });
 
   it('toggles raw detail view and copies raw response data', async () => {
@@ -258,8 +274,10 @@ describe('HistoryPage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('暂无历史记录')).toBeInTheDocument();
-    expect(screen.getByText('开始您的第一次写作反馈吧')).toBeInTheDocument();
+    expect(await screen.findByText('暂无复盘档案')).toBeInTheDocument();
+    expect(
+      screen.getByText('开始第一次申论批改后，这里会沉淀你的训练记录')
+    ).toBeInTheDocument();
   });
 
   it('shows an error state when the history request fails', async () => {
@@ -273,7 +291,7 @@ describe('HistoryPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/HTTP error! status: 500/)).toBeInTheDocument();
     });
-    expect(screen.getByText('暂无历史记录')).toBeInTheDocument();
+    expect(screen.getByText('暂无复盘档案')).toBeInTheDocument();
   });
 });
 
@@ -376,9 +394,11 @@ describe('HistoryPage live refresh subscription', () => {
       expect(getHistoryListCalls()).toBe(2);
     });
     expect(
-      (screen.getByPlaceholderText(
-        '搜索 ID、类型、任务类型或内容...'
-      ) as HTMLInputElement).value
+      (
+        screen.getByPlaceholderText(
+          '搜索 ID、类型、任务类型或内容...'
+        ) as HTMLInputElement
+      ).value
     ).toBe('基层治理');
     expect(screen.getByText(displayId(rawWritingItem.id))).toBeInTheDocument();
     expect(

@@ -88,19 +88,19 @@ describe('WritingPage', () => {
   it('renders the input form and initial empty result state', () => {
     renderPage();
 
-    expect(screen.getAllByText('智能写作反馈').length).toBeGreaterThan(0);
-    expect(screen.getByText(/墨评AI \/ 智能写作反馈/)).toBeInTheDocument();
+    expect(screen.getAllByText('申论智能批改').length).toBeGreaterThan(0);
+    expect(screen.getByText(/智考AI \/ 申论批改/)).toBeInTheDocument();
     expect(screen.getByText('学习工作台')).toBeInTheDocument();
-    expect(screen.getByText('当前任务')).toBeInTheDocument();
+    expect(screen.getByText('今日任务')).toBeInTheDocument();
     expect(screen.getByText(/材料完整/)).toBeInTheDocument();
-    const navLinks = within(screen.getByLabelText('墨评AI 导航')).getAllByRole(
+    const navLinks = within(screen.getByLabelText('智考AI 导航')).getAllByRole(
       'link'
     );
     expect(navLinks.map(link => link.textContent)).toEqual([
-      '首页',
-      '写作反馈',
-      '历史记录',
-      '设置',
+      '学习首页',
+      '申论批改',
+      '复盘档案',
+      '模型设置',
     ]);
     expect(navLinks.map(link => link.getAttribute('href'))).toEqual([
       '/',
@@ -108,7 +108,7 @@ describe('WritingPage', () => {
       '/history',
       '/settings',
     ]);
-    expect(screen.getByRole('link', { name: /查看历史记录/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /查看复盘档案/ })).toHaveAttribute(
       'href',
       '/history'
     );
@@ -131,9 +131,7 @@ describe('WritingPage', () => {
     );
     await user.click(screen.getByRole('button', { name: /开始AI批改/ }));
 
-    expect(
-      await screen.findByText('请先填写材料或要求')
-    ).toBeInTheDocument();
+    expect(await screen.findByText('请先填写材料或要求')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(received).toHaveLength(0);
     unsubscribe();

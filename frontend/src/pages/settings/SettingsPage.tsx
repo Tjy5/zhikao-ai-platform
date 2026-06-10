@@ -163,9 +163,9 @@ export default function SettingsPage() {
   return (
     <InkWashShell
       tone='form'
-      title='设置'
-      context='设置'
-      description='保存当前账号的 OpenAI 兼容模型配置，并查看最近一次能力状态。'
+      title='模型设置'
+      context='模型设置'
+      description='保存当前账号的 OpenAI 兼容模型配置，并查看最近一次批改能力状态。'
     >
       <div className='mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]'>
         <form onSubmit={handleSave} className='retained-form-card p-6 sm:p-7'>

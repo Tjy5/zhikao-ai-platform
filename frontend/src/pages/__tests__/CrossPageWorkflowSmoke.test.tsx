@@ -56,14 +56,14 @@ describe('retained route smoke and fallback route handling', () => {
 
     renderRoute('/');
     expect(
-      await screen.findByRole('heading', { level: 1, name: /智能写作反馈/ })
+      await screen.findByRole('heading', { level: 1, name: /智能公考学习平台/ })
     ).toBeInTheDocument();
-    expect(screen.getAllByText('墨评AI').length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: '开始写作反馈' })).toHaveAttribute(
+    expect(screen.getAllByText('智考AI').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('开始申论批改')[0]).toHaveAttribute(
       'href',
       '/writing'
     );
-    expect(screen.getByRole('link', { name: '查看历史记录' })).toHaveAttribute(
+    expect(screen.getAllByText('查看复盘档案')[0]).toHaveAttribute(
       'href',
       '/history'
     );
@@ -101,7 +101,7 @@ describe('retained route smoke and fallback route handling', () => {
       cleanup();
       renderRoute(route);
 
-      expect(screen.getAllByText('墨评AI').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('智考AI').length).toBeGreaterThan(0);
       for (const text of unexpectedRouteText) {
         expect(screen.queryByText(text)).not.toBeInTheDocument();
       }

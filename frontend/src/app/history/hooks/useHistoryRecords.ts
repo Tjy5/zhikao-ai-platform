@@ -80,7 +80,7 @@ export function useHistoryRecords(toast: ToastApi) {
   }, []);
 
   const clearAll = useCallback(async () => {
-    if (!confirm('确定清空所有历史记录？该操作不可恢复')) return;
+    if (!confirm('确定清空所有复盘档案？该操作不可恢复')) return;
     setDeleting(true);
     setError(null);
     try {

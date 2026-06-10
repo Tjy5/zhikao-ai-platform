@@ -9,10 +9,10 @@ interface NavigationLocation {
 }
 
 const retainedRouteTopNavItems = [
-  { label: '首页', href: '/' },
-  { label: '写作反馈', href: '/writing' },
-  { label: '历史记录', href: '/history' },
-  { label: '设置', href: '/settings' },
+  { label: '学习首页', href: '/' },
+  { label: '申论批改', href: '/writing' },
+  { label: '复盘档案', href: '/history' },
+  { label: '模型设置', href: '/settings' },
 ] as const;
 
 export const retainedRouteTopNavLabels = retainedRouteTopNavItems.map(

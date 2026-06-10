@@ -30,7 +30,7 @@ interface InkWashShellProps {
   children?: ReactNode;
 }
 
-const workflowSteps = ['拆解', '评分', '建议', '复盘'] as const;
+const workflowSteps = ['诊断', '训练', '批改', '复盘'] as const;
 
 export default function InkWashShell({
   title,
@@ -65,16 +65,16 @@ export default function InkWashShell({
       )}
     >
       <div className='pointer-events-none absolute inset-0' aria-hidden='true'>
-        <div className='absolute inset-0 bg-paper/72' />
+        <div className='absolute inset-0 bg-paper/76' />
         {isWorkbench && (
           <>
-            <div className='ink-wash-landscape absolute inset-x-0 top-0 h-[22rem] opacity-60' />
-            <div className='ink-bleed absolute -left-20 top-60 h-56 w-56 opacity-22' />
-            <div className='ink-bleed absolute -right-16 bottom-14 h-64 w-64 opacity-18' />
+            <div className='civic-scanline absolute inset-x-0 top-0 h-[24rem] opacity-70' />
+            <div className='civic-signal-field civic-signal-field-primary absolute -right-10 top-24 h-80 w-[34rem] opacity-70' />
+            <div className='civic-signal-field civic-signal-field-secondary absolute -left-14 bottom-10 h-72 w-[32rem] opacity-60' />
           </>
         )}
         {isForm && (
-          <div className='ink-bleed absolute -right-24 -top-10 h-72 w-72 opacity-15' />
+          <div className='civic-signal-field civic-signal-field-primary absolute -right-24 -top-10 h-72 w-[28rem] opacity-45' />
         )}
       </div>
 
@@ -141,7 +141,7 @@ function WorkbenchHeader({ title, context, description }: HeaderProps) {
     <div className='max-w-3xl'>
       <div className='mb-5 flex flex-wrap items-center gap-3'>
         <p className='rounded-[6px] border border-ink-light/12 bg-paper/74 px-4 py-2 font-kaishu text-sm text-ink shadow-sm'>
-          墨评AI / {context}
+          智考AI / {context}
         </p>
         <span className='rounded-[6px] border border-ink-light/12 bg-paper-rice/78 px-3 py-1 font-kaishu text-sm text-ink'>
           学习工作台
@@ -183,7 +183,7 @@ function FormHeader({ title, context, description }: HeaderProps) {
   return (
     <div className='text-center sm:text-left'>
       <p className='inline-flex rounded-[6px] border border-ink-light/12 bg-paper/74 px-3 py-1 font-kaishu text-xs text-ink shadow-sm'>
-        墨评AI / {context}
+        智考AI / {context}
       </p>
       <h1 className='mt-4 font-running-script text-4xl font-normal leading-tight text-ink sm:text-5xl'>
         {title}
@@ -203,7 +203,7 @@ function FallbackHeader({ title, context, description }: HeaderProps) {
   return (
     <div className='flex flex-col items-center'>
       <p className='inline-flex rounded-[6px] border border-ink-light/12 bg-paper/74 px-3 py-1 font-kaishu text-xs text-ink shadow-sm'>
-        墨评AI / {context}
+        智考AI / {context}
       </p>
       <h1 className='mt-5 font-cursive-title text-5xl font-normal leading-tight text-ink sm:text-6xl'>
         {title}
@@ -226,11 +226,11 @@ function WorkbenchSideCard({ actions, metrics }: WorkbenchSideCardProps) {
     <aside className='retained-surface p-5'>
       <div className='mb-4 flex items-center justify-between gap-4 border-b border-ink-light/10 px-1 pb-4'>
         <div>
-          <p className='font-kaishu text-sm text-seal-red'>当前任务</p>
-          <p className='mt-1 font-running-script text-3xl text-ink'>专注一篇</p>
+          <p className='font-kaishu text-sm text-civic-blue'>今日任务</p>
+          <p className='mt-1 font-running-script text-3xl text-ink'>专注提分</p>
         </div>
-        <span className='flex h-14 w-14 items-center justify-center rounded-full bg-peach-soft/48'>
-          <BookOpenCheck className='h-5 w-5 text-ink/70' />
+        <span className='flex h-14 w-14 items-center justify-center rounded-[6px] border border-civic-blue/14 bg-civic-blue/8'>
+          <BookOpenCheck className='h-5 w-5 text-civic-blue' />
         </span>
       </div>
       {metrics.length > 0 && (
@@ -259,7 +259,7 @@ function WorkbenchSideCard({ actions, metrics }: WorkbenchSideCardProps) {
               className={cn(
                 'ink-hover inline-flex items-center justify-center gap-2 rounded-[6px] border px-5 py-3 font-kaishu text-base transition duration-200 focus-visible:ring-2 focus-visible:ring-seal/30',
                 action.variant === 'primary'
-                  ? 'border-ink bg-ink text-paper shadow-sm hover:-translate-y-0.5 hover:bg-ink-light'
+                  ? 'border-civic-blue bg-civic-blue text-paper shadow-sm hover:-translate-y-0.5 hover:bg-civic-blue-dark'
                   : 'border-ink-light/30 bg-paper-rice text-ink hover:-translate-y-0.5 hover:bg-paper'
               )}
             >

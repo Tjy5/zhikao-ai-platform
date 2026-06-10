@@ -43,7 +43,7 @@ export default function LoginPage() {
       tone='form'
       title='登录'
       context='登录'
-      description='登录后进入写作反馈、历史复盘和模型设置。'
+      description='登录后进入申论批改、复盘档案和模型设置，继续你的公考备考节奏。'
     >
       <form
         onSubmit={handleSubmit}

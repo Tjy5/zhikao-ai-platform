@@ -41,7 +41,7 @@ export default function RegisterPage() {
       tone='form'
       title='注册'
       context='注册'
-      description='创建账号后即可保存自己的模型设置和历史记录。'
+      description='创建账号后即可保存模型配置、申论批改记录和个人复盘档案。'
     >
       <form
         onSubmit={handleSubmit}

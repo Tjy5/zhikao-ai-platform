@@ -17,11 +17,11 @@ export default function HistoryPage() {
 
   return (
     <InkWashShell
-      title='历史记录'
-      context='历史记录'
-      description='集中查看写作反馈记录，按时间、类型和任务类型筛选，展开原始 Markdown、历史 JSON 与兼容旧结构。'
+      title='复盘档案'
+      context='复盘档案'
+      description='集中查看申论批改记录，按时间、题型和任务类型筛选，定位得分变化、扣分原因和下一次训练重点。'
       actions={[
-        { label: '开始写作反馈', to: '/writing', variant: 'primary' },
+        { label: '开始申论批改', to: '/writing', variant: 'primary' },
         { label: '返回首页', to: '/', variant: 'secondary' },
       ]}
       metrics={[
@@ -37,17 +37,18 @@ export default function HistoryPage() {
               <div className='mb-3 flex items-center gap-3'>
                 <span className='seal-mark text-lg'>历</span>
                 <span className='font-semi-cursive text-3xl text-ink'>
-                  历史复盘
+                  复盘档案
                 </span>
                 <span className='rounded-[4px] border border-ink-light/15 bg-paper-rice/70 px-3 py-1 font-kaishu text-xs text-ink'>
                   评分明细
                 </span>
               </div>
               <p className='font-kaishu text-lg leading-9 text-ink-wash'>
-                按时间、类型和任务类型筛选记录，右侧查看原始 Markdown、兼容旧记录和原始 JSON。
+                按时间、题型和任务类型筛选记录，右侧查看答案、评分明细、AI
+                反馈和原始批改数据。
               </p>
               <div className='mt-5 flex flex-wrap gap-2'>
-                {['记录筛选', '原始内容', '历史 JSON', '兼容旧记录'].map(item => (
+                {['记录筛选', '答案回看', '扣分原因', '提分建议'].map(item => (
                   <span
                     key={item}
                     className='rounded-[4px] border border-ink-light/10 bg-paper/70 px-3 py-1.5 font-kaishu text-xs text-ink'

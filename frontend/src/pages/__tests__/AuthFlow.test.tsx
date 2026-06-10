@@ -80,7 +80,7 @@ describe('auth flow', () => {
     await user.click(screen.getByRole('button', { name: /^登录$/ }));
 
     expect(
-      await screen.findByRole('heading', { name: '设置' })
+      await screen.findByRole('heading', { name: '模型设置' })
     ).toBeInTheDocument();
     expect(getStoredAuthToken()).toBe('token-login');
   });
@@ -106,7 +106,7 @@ describe('auth flow', () => {
 
     renderRoute('/settings');
     expect(
-      await screen.findByRole('heading', { name: '设置' })
+      await screen.findByRole('heading', { name: '模型设置' })
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '退出登录' }));
 
@@ -128,7 +128,9 @@ describe('auth flow', () => {
     expect(shell).toBeInTheDocument();
     expect(shell).toHaveClass('retained-form-shell');
     expect(
-      screen.getByText('创建账号后即可保存自己的模型设置和历史记录。')
+      screen.getByText(
+        '创建账号后即可保存模型配置、申论批改记录和个人复盘档案。'
+      )
     ).toBeInTheDocument();
     expect(screen.getByLabelText('用户名')).toBeInTheDocument();
     expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
@@ -139,7 +141,7 @@ describe('auth flow', () => {
       '/login?next=%2Fsettings'
     );
     expect(screen.queryByText('学习工作台')).not.toBeInTheDocument();
-    expect(screen.queryByText('当前任务')).not.toBeInTheDocument();
-    expect(screen.queryByText('1. 拆解')).not.toBeInTheDocument();
+    expect(screen.queryByText('今日任务')).not.toBeInTheDocument();
+    expect(screen.queryByText('1. 诊断')).not.toBeInTheDocument();
   });
 });

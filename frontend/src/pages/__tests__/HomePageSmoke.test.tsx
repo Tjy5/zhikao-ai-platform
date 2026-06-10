@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe('home page smoke test', () => {
-  it('renders the ink-wash writing grading home page with user-facing workflow content', async () => {
+  it('renders the civic exam learning platform home page with user-facing workflow content', async () => {
     const fetchMock = vi.fn(() =>
       jsonResponse({
         items: [
@@ -45,37 +45,43 @@ describe('home page smoke test', () => {
     const { container } = renderHome();
 
     expect(
-      await screen.findByRole('heading', { level: 1, name: /智能写作反馈/ })
+      await screen.findByRole('heading', { level: 1, name: /智能公考学习平台/ })
     ).toBeInTheDocument();
-    expect(screen.getAllByText('墨评AI').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('智考AI').length).toBeGreaterThan(0);
     expect(
       screen.getByText(
-        '上传材料与作答内容，系统生成评分、评语与修改建议，帮助你复盘每一次写作训练。'
+        '围绕公务员考试的长期备考路径，把训练计划、申论批改、历史复盘和模型配置放进同一个学习指挥舱。'
       )
     ).toBeInTheDocument();
-    expect(screen.getByText('写作工作台')).toBeInTheDocument();
-    expect(screen.getAllByText('首页').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('写作反馈').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('历史记录').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('提交作答').length).toBeGreaterThan(0);
+    expect(screen.getByText('AI 驱动的公考备考工作台')).toBeInTheDocument();
+    expect(screen.getAllByText('学习首页').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('申论批改').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('复盘档案').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('模型设置').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('诊断薄弱项').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('专项训练').length).toBeGreaterThan(0);
     expect(screen.getAllByText('智能批改').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('历史复盘').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('复盘提分').length).toBeGreaterThan(0);
+
     const companion = screen.getByTestId('ink-companion-hero');
-    expect(companion).toHaveAttribute('data-companion-identity', 'human');
+    expect(companion).toHaveAttribute(
+      'data-companion-identity',
+      'civil-service-learning-dashboard'
+    );
     expect(companion).toHaveAttribute(
       'data-companion-source',
       'selected-chatgpt-static'
     );
     expect(companion).toHaveAttribute(
       'data-layered-scene',
-      'scholar-only-scene'
+      'civic-study-dashboard-scene'
     );
     expect(companion).not.toHaveAttribute('data-paper-crane-role');
 
     const layeredScene = screen.getByTestId('ink-companion-layered-scene');
     expect(layeredScene).toHaveAttribute(
       'data-scene-role',
-      'integrated-layered-companion-scene'
+      'integrated-civic-learning-scene'
     );
 
     const companionImages = Array.from(companion.querySelectorAll('img'));
@@ -104,34 +110,39 @@ describe('home page smoke test', () => {
         'ink-companion-hero-backdrop.webp'
       );
     }
-    expect(screen.getByText('先提交作答')).toBeInTheDocument();
-    expect(screen.getByText('再复盘反馈')).toBeInTheDocument();
+
+    expect(screen.getByText('先看清短板')).toBeInTheDocument();
+    expect(screen.getByText('再安排训练')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { level: 2, name: '写作反馈与历史复盘' })
+      screen.getByRole('heading', {
+        level: 2,
+        name: '智能公考学习平台核心功能',
+      })
     ).toBeInTheDocument();
     expect(screen.queryByText('要求拆解')).not.toBeInTheDocument();
     expect(screen.queryByText('修改建议')).not.toBeInTheDocument();
-    expect(screen.getByText('批改流程')).toBeInTheDocument();
-    expect(screen.getByText('立即提交写作')).toBeInTheDocument();
+    expect(screen.getByText('公考备考指挥舱')).toBeInTheDocument();
+    expect(screen.getAllByText('开始申论批改').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('查看复盘档案').length).toBeGreaterThan(0);
 
     await waitFor(() => {
-      const writingStat = screen.getByText('来自反馈历史').parentElement;
-      const scoreStat = screen.getByText('来自批改历史').parentElement;
+      const writingStat = screen.getByText('已沉淀作答记录').parentElement;
+      const scoreStat = screen.getByText('来自历史批改').parentElement;
 
-      expect(writingStat).toHaveTextContent('批改记录');
+      expect(writingStat).toHaveTextContent('申论批改');
       expect(writingStat).toHaveTextContent('2');
-      expect(scoreStat).toHaveTextContent('平均分');
+      expect(scoreStat).toHaveTextContent('平均得分');
       expect(scoreStat).toHaveTextContent('85');
     });
 
-    const navLinks = within(screen.getByLabelText('墨评AI 导航')).getAllByRole(
+    const navLinks = within(screen.getByLabelText('智考AI 导航')).getAllByRole(
       'link'
     );
     expect(navLinks.map(link => link.textContent)).toEqual([
-      '首页',
-      '写作反馈',
-      '历史记录',
-      '设置',
+      '学习首页',
+      '申论批改',
+      '复盘档案',
+      '模型设置',
     ]);
     expect(navLinks.map(link => link.getAttribute('href'))).toEqual([
       '/',

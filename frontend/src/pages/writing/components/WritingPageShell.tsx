@@ -32,15 +32,15 @@ export default function WritingPageShell({
 }: WritingPageShellProps) {
   return (
     <InkWashShell
-      title='智能写作反馈'
-      context='智能写作反馈'
-      description='把材料与要求和作答放进一张浅色工作台，交给 AI 生成可直接阅读的 Markdown 批改结果。'
+      title='申论智能批改'
+      context='申论批改'
+      description='把材料、题干和作答放进同一张训练工作台，交给 AI 生成评分、扣分原因和下一次作答建议。'
       actions={[
-        { label: '查看历史记录', to: '/history', variant: 'primary' },
+        { label: '查看复盘档案', to: '/history', variant: 'primary' },
         { label: '返回首页', to: '/', variant: 'secondary' },
       ]}
       metrics={[
-        { label: '工作流', value: '批改' },
+        { label: '工作流', value: '申论' },
         { label: '结果', value: gradingResult ? '已生成' : '待提交' },
         {
           label: '进度',

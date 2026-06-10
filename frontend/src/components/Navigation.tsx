@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { GraduationCap, Menu, X } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
@@ -20,8 +20,8 @@ export default function Navigation() {
       'rounded-md px-4 py-2 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-seal/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
       'border',
       isActive(href)
-        ? 'border-ink bg-ink text-paper shadow-sm'
-        : 'border-transparent text-ink hover:border-ink-light/30 hover:bg-paper-ivory hover:shadow-sm'
+        ? 'border-civic-blue bg-civic-blue text-paper shadow-sm'
+        : 'border-transparent text-ink hover:border-civic-blue/30 hover:bg-paper-ivory hover:shadow-sm'
     );
 
   return (
@@ -36,10 +36,10 @@ export default function Navigation() {
             <span
               className={cn(
                 'flex h-11 w-11 items-center justify-center rounded-xl text-lg font-kaishu transition-transform group-hover:-rotate-3',
-                'border border-seal-red bg-seal-red text-paper shadow-sm'
+                'border border-civic-blue bg-civic-blue text-paper shadow-sm'
               )}
             >
-              墨
+              <GraduationCap className='h-5 w-5' aria-hidden='true' />
             </span>
             <span
               className={cn(
@@ -47,7 +47,7 @@ export default function Navigation() {
                 'text-ink'
               )}
             >
-              墨评AI
+              智考AI
             </span>
           </Link>
 

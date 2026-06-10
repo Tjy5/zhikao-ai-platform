@@ -80,10 +80,10 @@ export default function HistoryList({
               aria-hidden='true'
             />
             <div className='mb-2 font-kaishu text-lg text-ink-wash'>
-              暂无历史记录
+              暂无复盘档案
             </div>
             <div className='text-base text-ink-wash/70'>
-              开始您的第一次写作反馈吧
+              开始第一次申论批改后，这里会沉淀你的训练记录
             </div>
           </div>
         )}

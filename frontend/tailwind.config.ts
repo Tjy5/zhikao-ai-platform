@@ -69,6 +69,13 @@ const config: Config = {
           DEFAULT: 'hsl(var(--sky-accent))',
           soft: 'hsl(var(--sky-soft))',
         },
+        civic: {
+          blue: 'hsl(var(--civic-blue))',
+          'blue-dark': 'hsl(var(--civic-blue-dark))',
+          green: 'hsl(var(--civic-green))',
+          amber: 'hsl(var(--civic-amber))',
+          line: 'hsl(var(--civic-line))',
+        },
         gold: {
           accent: 'hsl(var(--gold-accent))',
         },

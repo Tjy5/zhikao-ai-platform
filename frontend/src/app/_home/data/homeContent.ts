@@ -1,30 +1,46 @@
-export const workflowLabels = ['提交作答', '智能批改', '历史复盘'] as const;
+export const workflowLabels = [
+  '诊断薄弱项',
+  '专项训练',
+  '智能批改',
+  '复盘提分',
+] as const;
 
 export const pageCards = [
   {
-    title: '首页',
-    subtitle: '查看批改概览、最近统计和快捷操作。',
-    metricLabel: '学习台:',
+    title: '学习首页',
+    subtitle: '汇总训练数据、薄弱项和下一步学习任务。',
+    metricLabel: '入口',
     metric: 'home',
     href: '/',
-    badge: '概览',
+    badge: '总览',
   },
   {
-    title: '写作反馈',
-    subtitle: '提交材料和答案，查看评分、评语与修改建议。',
-    metricLabel: '批改记录:',
+    title: '申论批改',
+    subtitle: '提交材料与作答，生成评分、评语和可执行修改建议。',
+    metricLabel: '已批改',
     metric: 'totalWritings',
     href: '/writing',
-    badge: '批改',
+    badge: '训练',
   },
   {
-    title: '历史记录',
-    subtitle: '回看已保存的写作反馈记录、分数和反馈。',
-    metricLabel: '历史:',
+    title: '复盘档案',
+    subtitle: '回看历史答案、得分走势和每次训练的扣分原因。',
+    metricLabel: '档案',
     metric: 'history',
     href: '/history',
     badge: '复盘',
   },
+  {
+    title: '模型设置',
+    subtitle: '配置 AI 模型、服务地址和测试状态，保持批改链路可用。',
+    metricLabel: '配置',
+    metric: 'settings',
+    href: '/settings',
+    badge: '系统',
+  },
 ] as const;
 
-export const ctaLines = ['马上提交作答。', '回看历史反馈。'] as const;
+export const ctaLines = [
+  '下一套题，从薄弱项开始。',
+  '把每次训练沉淀成提分路径。',
+] as const;

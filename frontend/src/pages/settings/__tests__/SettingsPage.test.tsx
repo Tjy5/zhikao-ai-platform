@@ -115,7 +115,10 @@ function setupSettingsFetch(
       return jsonResponse(settings);
     }
 
-    if (url.endsWith('/api/v1/settings/writing-ai/models') && method === 'POST') {
+    if (
+      url.endsWith('/api/v1/settings/writing-ai/models') &&
+      method === 'POST'
+    ) {
       const payload = JSON.parse(
         String(init?.body ?? '{}')
       ) as ModelDiscoveryPayload;
@@ -205,7 +208,7 @@ describe('SettingsPage', () => {
     renderSettingsRoute();
 
     expect(
-      await screen.findByRole('heading', { name: '设置' })
+      await screen.findByRole('heading', { name: '模型设置' })
     ).toBeInTheDocument();
     const baseUrl = screen.getByLabelText('服务地址');
     const modelName = screen.getByLabelText('模型名称');
