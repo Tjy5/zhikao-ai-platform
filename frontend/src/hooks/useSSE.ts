@@ -113,7 +113,9 @@ export function useSSE<TEvent = unknown>(
                       onMessage(data);
                     }
                   } catch (parseError) {
-                    console.error('Failed to parse SSE data:', parseError);
+                    if (import.meta.env.DEV) {
+                      console.error('Failed to parse SSE data:', parseError);
+                    }
                   }
                 }
               }
@@ -138,7 +140,9 @@ export function useSSE<TEvent = unknown>(
                 const data: TEvent = JSON.parse(event.data);
                 onMessage(data);
               } catch (parseError) {
-                console.error('Failed to parse SSE data:', parseError);
+                if (import.meta.env.DEV) {
+                  console.error('Failed to parse SSE data:', parseError);
+                }
               }
             }
           };

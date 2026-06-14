@@ -14,7 +14,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // can short-circuit to "not loading" without a synchronous setState in the
     // mount effect (avoids react-hooks/set-state-in-effect). When a token is
     // present we keep isLoading=true until the mount effect verifies it.
-    const token = localStorage.getItem('token');
+    // Check both localStorage and sessionStorage for token
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     return {
       user: null,
       token,
@@ -29,10 +30,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       password,
     });
 
-    // Store token
+    // Store token based on rememberMe. Clear both locations first so a stale
+    // token in the other storage cannot win when apiClient reads auth state.
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     const storage = rememberMe ? localStorage : sessionStorage;
     storage.setItem('token', response.access_token);
-    localStorage.setItem('token', response.access_token); // Always use localStorage for now
 
     // Fetch user info
     const user = await authService.me();
@@ -45,7 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
   }, []);
 
-  const register = useCallback(async (username: string, email: string, password: string) => {
+  const register = useCallback(async (username: string, email: string, password: string, rememberMe: boolean = true) => {
     // Register returns user, but we need to login to get token
     await authService.register({
       username,
@@ -53,8 +56,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       password,
     });
 
-    // Auto-login after successful registration
-    await login(email, password);
+    // Auto-login after successful registration with rememberMe support
+    await login(email, password, rememberMe);
   }, [login]);
 
   const logout = useCallback(() => {
@@ -69,7 +72,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const checkAuth = useCallback(async () => {
-    const token = localStorage.getItem('token');
+    // Check both storage locations for token
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
       // Initial state already reflects "no token, not loading"; nothing to do.
       return;
@@ -84,8 +88,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isLoading: false,
       });
     } catch {
-      // Token invalid or expired
+      // Token invalid or expired - clean up both storage locations
       localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       setState({
         user: null,
         token: null,
@@ -99,7 +104,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // effect body so the linter can see every setState happens after an `await`
   // (asynchronous), not synchronously during the effect run.
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    // Check both storage locations for token
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
       // Initial state already reflects "no token, not loading"; nothing to do.
       return;
@@ -118,8 +124,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
       } catch {
         if (!isMounted) return;
-        // Token invalid or expired
+        // Token invalid or expired - clean up both storage locations
         localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
         setState({
           user: null,
           token: null,

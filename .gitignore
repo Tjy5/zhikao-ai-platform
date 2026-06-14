@@ -186,6 +186,7 @@ venv.bak/
 .claude/
 .codex/
 .cursor/
+.impeccable/
 .opencode/
 .serena/
 .trellis/
@@ -238,3 +239,11 @@ backend/uploads/
 
 # Frontend logs
 frontend/.logs/
+
+# Old frontend backup (ink-wash system)
+frontend-old/
+
+# Debug files and screenshots
+frontend/*.mjs
+frontend/*.png
+frontend/verification-screenshots/

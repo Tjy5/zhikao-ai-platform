@@ -350,7 +350,7 @@ export default function HistoryPage() {
   const selectedCount = selectedIds.size;
 
   return (
-    <div className="min-h-screen bg-paper-white">
+    <main id="main-content" className="min-h-screen bg-paper-white">
       <div className="max-w-content mx-auto px-4 py-8">
         {/* Sticky header */}
         <div className="mb-6 sticky top-0 bg-paper-white z-10 pb-4 -mx-4 px-4 border-b border-slate-gray/10">
@@ -408,7 +408,7 @@ export default function HistoryPage() {
                     key={key}
                     type="button"
                     onClick={() => setTimeRange(key)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-smooth min-h-[36px] ${
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-smooth min-h-[44px] ${
                       timeRange === key
                         ? 'bg-vermilion text-paper-white'
                         : 'bg-paper-white text-slate-gray hover:text-deep-ink border border-slate-gray/20'
@@ -422,7 +422,7 @@ export default function HistoryPage() {
 
               {/* Select-all (only when there are filtered results) */}
               {hasFilterResults && (
-                <label className="flex items-center gap-2 text-sm text-slate-gray cursor-pointer select-none min-h-[36px]">
+                <label className="flex items-center gap-2 text-sm text-slate-gray cursor-pointer select-none p-3 -m-3">
                   <input
                     type="checkbox"
                     checked={allFilteredSelected}
@@ -543,7 +543,7 @@ export default function HistoryPage() {
             <div className="space-y-2">
               {/* Loading skeleton */}
               {isLoadingList && (
-                <>
+                <div aria-busy="true" aria-label="加载历史记录中">
                   {[0, 1, 2, 3].map((i) => (
                     <div
                       key={i}
@@ -555,7 +555,7 @@ export default function HistoryPage() {
                       <div className="h-3 w-12 bg-slate-gray/20 rounded" />
                     </div>
                   ))}
-                </>
+                </div>
               )}
 
               {/* List error */}
@@ -656,12 +656,15 @@ export default function HistoryPage() {
                             {excerpt || '(无批改内容)'}
                           </p>
                         </button>
+                        <label htmlFor={`checkbox-${item.id}`} className="sr-only">
+                          选择记录 {excerpt}
+                        </label>
                         <input
+                          id={`checkbox-${item.id}`}
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleRowSelection(item.id)}
                           onClick={(e) => e.stopPropagation()}
-                          aria-label={`选择记录 ${excerpt}`}
                           className="absolute left-3 top-4 w-4 h-4 rounded border-slate-gray/40 text-vermilion focus:ring-vermilion cursor-pointer"
                         />
                       </div>
@@ -749,7 +752,7 @@ export default function HistoryPage() {
           />
         )}
       </div>
-    </div>
+    </main>
   );
 }
 

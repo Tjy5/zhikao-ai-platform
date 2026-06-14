@@ -9,13 +9,15 @@ class ApiClient {
   }
 
   private getToken(): string | null {
-    return localStorage.getItem('token');
+    // Check both storage locations for token
+    return localStorage.getItem('token') || sessionStorage.getItem('token');
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
     if (response.status === 401) {
-      // Auto-logout on unauthorized
+      // Auto-logout on unauthorized - clean up both storage locations
       localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       window.location.href = '/login';
       throw new AppError(ErrorType.AUTH, 'Unauthorized', { status: 401 });
     }

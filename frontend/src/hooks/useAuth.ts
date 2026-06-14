@@ -10,7 +10,7 @@ export interface AuthState {
 
 export interface AuthContextValue extends AuthState {
   login: (usernameOrEmail: string, password: string, rememberMe?: boolean) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  register: (username: string, email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
 }

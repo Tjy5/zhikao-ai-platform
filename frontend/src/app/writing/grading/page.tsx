@@ -4,6 +4,7 @@ import { useSSE } from '../../../hooks/useSSE';
 import { writingService } from '../../../services/writingService';
 import { Button } from '../../../components/ui/Button';
 import { MarkdownRenderer } from '../../../components/ui/MarkdownRenderer';
+import { Toast } from '../../../components/ui/Toast';
 import type { SSEProgressEvent } from '../../../types/api';
 
 export default function GradingPage() {
@@ -25,6 +26,7 @@ export default function GradingPage() {
   } | null>(null);
   const [isComplete, setIsComplete] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Redirect if no content
   useEffect(() => {
@@ -34,7 +36,10 @@ export default function GradingPage() {
   }, [content, navigate]);
 
   const handleSSEMessage = useCallback((data: SSEProgressEvent) => {
-    console.log('SSE event received:', data);
+    // Debug logging only in development
+    if (import.meta.env.DEV) {
+      console.log('SSE event received:', data);
+    }
 
     if (data.stage === 'error') {
       setHasError(true);
@@ -60,14 +65,17 @@ export default function GradingPage() {
   }, []);
 
   const handleSSEError = useCallback((event: Event) => {
-    console.error('SSE connection error:', event);
+    // Debug logging only in development
+    if (import.meta.env.DEV) {
+      console.error('SSE connection error:', event);
+    }
     setHasError(true);
     setStatus('连接中断');
     setMessage('与服务器的连接已中断，请刷新页面重试');
   }, []);
 
   // Get JWT token for authorization
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
   const { isConnected } = useSSE<SSEProgressEvent>(
@@ -99,7 +107,7 @@ export default function GradingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-paper-white">
+    <main id="main-content" className="min-h-screen bg-paper-white">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
@@ -192,6 +200,7 @@ export default function GradingPage() {
                 className="w-6 h-6 text-error-crimson flex-shrink-0 mt-0.5"
                 fill="currentColor"
                 viewBox="0 0 20 20"
+                aria-hidden="true"
               >
                 <path
                   fillRule="evenodd"
@@ -200,7 +209,7 @@ export default function GradingPage() {
                 />
               </svg>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-error-crimson mb-2">{status}</h3>
+                <h2 className="text-lg font-semibold text-error-crimson mb-2">{status}</h2>
                 <p className="text-sm text-deep-ink mb-3">{message}</p>
                 {errorInfo?.classification && (
                   <p className="text-xs text-slate-gray mb-2">
@@ -254,7 +263,7 @@ export default function GradingPage() {
               <Button
                 onClick={() => {
                   navigator.clipboard.writeText(result);
-                  alert('批改结果已复制到剪贴板');
+                  setToastMessage('批改结果已复制到剪贴板');
                 }}
                 variant="ghost"
               >
@@ -264,6 +273,15 @@ export default function GradingPage() {
           </div>
         )}
       </div>
-    </div>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type="success"
+          onClose={() => setToastMessage(null)}
+        />
+      )}
+    </main>
   );
 }

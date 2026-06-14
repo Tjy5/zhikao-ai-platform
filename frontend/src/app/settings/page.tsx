@@ -223,16 +223,57 @@ export default function SettingsPage() {
     showToast(`已选择模型: ${modelId}`, 'info');
   };
 
+  // Focus trap for modal
+  useEffect(() => {
+    if (!showModelsModal) return;
+
+    const modalElement = document.querySelector('[role="dialog"]');
+    if (!modalElement) return;
+
+    const focusableElements = modalElement.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstElement = focusableElements[0] as HTMLElement;
+    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      if (e.shiftKey && document.activeElement === firstElement) {
+        e.preventDefault();
+        lastElement?.focus();
+      } else if (!e.shiftKey && document.activeElement === lastElement) {
+        e.preventDefault();
+        firstElement?.focus();
+      }
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowModelsModal(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleTab);
+    document.addEventListener('keydown', handleEscape);
+    firstElement?.focus();
+
+    return () => {
+      document.removeEventListener('keydown', handleTab);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showModelsModal]);
+
   if (isLoadingSettings) {
     return (
-      <div className="min-h-screen bg-paper-white flex items-center justify-center">
-        <div className="text-slate-gray">加载设置中...</div>
-      </div>
+      <main id="main-content" className="min-h-screen bg-paper-white flex items-center justify-center">
+        <div className="text-slate-gray" role="status" aria-live="polite">加载设置中...</div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-paper-white">
+    <main id="main-content" className="min-h-screen bg-paper-white">
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-display text-deep-ink mb-2">AI 配置</h1>
         <p className="text-slate-gray mb-8">配置写作批改所使用的 AI 提供商</p>
@@ -383,15 +424,17 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="json-fallback"
-                checked={formData.json_fallback_enabled}
-                onChange={(e) => setFormData((prev) => ({ ...prev, json_fallback_enabled: e.target.checked }))}
-                className="w-4 h-4 text-vermilion border-slate-gray/30 rounded focus:ring-vermilion"
-              />
-              <label htmlFor="json-fallback" className="text-sm text-deep-ink cursor-pointer">
-                启用 JSON 降级模式
+              <label htmlFor="json-fallback" className="flex items-center gap-2 cursor-pointer p-3 -m-3">
+                <input
+                  type="checkbox"
+                  id="json-fallback"
+                  checked={formData.json_fallback_enabled}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, json_fallback_enabled: e.target.checked }))}
+                  className="w-4 h-4 text-vermilion border-slate-gray/30 rounded focus:ring-vermilion"
+                />
+                <span className="text-sm text-deep-ink">
+                  启用 JSON 降级模式
+                </span>
               </label>
             </div>
           </div>
@@ -406,7 +449,8 @@ export default function SettingsPage() {
               variant="secondary"
               onClick={handleTestConnection}
               isLoading={isTesting}
-              disabled={!currentSettings?.has_api_key && !formData.api_key?.trim()}
+              disabled={!currentSettings?.has_api_key}
+              aria-label="测试已保存的配置"
             >
               测试连接
             </Button>
@@ -420,6 +464,10 @@ export default function SettingsPage() {
               发现模型
             </Button>
           </div>
+
+          <p className="mt-3 text-sm text-slate-gray">
+            💡 提示：「测试连接」按钮测试的是已保存的配置。如有未保存的更改，请先保存设置再测试。
+          </p>
         </form>
 
         {/* Models Discovery Modal */}
@@ -427,16 +475,31 @@ export default function SettingsPage() {
           <div
             className="fixed inset-0 bg-deep-ink/50 flex items-center justify-center z-50 p-4"
             onClick={() => setShowModelsModal(false)}
+            role="dialog"
+            aria-labelledby="models-modal-title"
+            aria-modal="true"
           >
             <div
               className="bg-paper-white rounded-lg shadow-lift max-w-2xl w-full max-h-[80vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-slate-gray/20">
-                <h3 className="text-xl font-semibold text-deep-ink">可用模型列表</h3>
-                <p className="text-sm text-slate-gray mt-1">
-                  发现 {discoveredModels.model_count} 个模型
-                </p>
+              <div className="p-6 border-b border-slate-gray/20 flex items-center justify-between">
+                <div>
+                  <h3 id="models-modal-title" className="text-xl font-semibold text-deep-ink">可用模型列表</h3>
+                  <p className="text-sm text-slate-gray mt-1">
+                    发现 {discoveredModels.model_count} 个模型
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowModelsModal(false)}
+                  className="p-2 hover:bg-slate-gray/10 rounded-md transition-smooth min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  aria-label="关闭模型列表"
+                >
+                  <svg className="w-5 h-5 text-slate-gray" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
               </div>
 
               <div className="p-6 overflow-y-auto max-h-[60vh]">
@@ -476,6 +539,6 @@ export default function SettingsPage() {
           />
         )}
       </div>
-    </div>
+    </main>
   );
 }

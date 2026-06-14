@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Toast, type ToastType } from '../../components/ui/Toast';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 
 interface ToastState {
   show: boolean;
@@ -16,10 +17,26 @@ export default function WritingPage() {
   // Content state
   const [content, setContent] = useState('');
   const [toast, setToast] = useState<ToastState>({ show: false, message: '', type: 'info' });
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Statistics
   const charCount = content.length;
-  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+
+  // Mixed word/character count: count Chinese characters individually, English words by whitespace
+  const wordCount = (() => {
+    if (!content.trim()) return 0;
+
+    // Match Chinese characters (CJK Unified Ideographs + extensions)
+    const chineseChars = content.match(/[一-鿿㐀-䶿\u{20000}-\u{2a6df}\u{2a700}-\u{2b73f}\u{2b740}-\u{2b81f}\u{2b820}-\u{2ceaf}豈-﫿㌀-㏿︰-﹏豈-﫿\u{2f800}-\u{2fa1f}]/gu);
+    const chineseCount = chineseChars ? chineseChars.length : 0;
+
+    // Remove Chinese characters and count remaining words by whitespace
+    const nonChinese = content.replace(/[一-鿿㐀-䶿\u{20000}-\u{2a6df}\u{2a700}-\u{2b73f}\u{2b740}-\u{2b81f}\u{2b820}-\u{2ceaf}豈-﫿㌀-㏿︰-﹏豈-﫿\u{2f800}-\u{2fa1f}]/gu, ' ').trim();
+    const englishWords = nonChinese ? nonChinese.split(/\s+/).filter(w => w.length > 0).length : 0;
+
+    return chineseCount + englishWords;
+  })();
+
   const paragraphCount = content.trim() ? content.split(/\n\n+/).filter(p => p.trim()).length : 0;
   const estimatedTime = Math.ceil(charCount / 50); // Rough estimate: 50 chars/sec
 
@@ -53,7 +70,7 @@ export default function WritingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-paper-white">
+    <main id="main-content" className="min-h-screen bg-paper-white">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-display text-deep-ink mb-2">写作批改</h1>
@@ -144,9 +161,7 @@ export default function WritingPage() {
                 <button
                   onClick={() => {
                     if (content.trim()) {
-                      if (confirm('确定要清空当前内容吗？')) {
-                        setContent('');
-                      }
+                      setShowClearConfirm(true);
                     }
                   }}
                   className="w-full px-4 py-2 text-sm text-slate-gray hover:text-deep-ink border border-slate-gray/20 rounded-md hover:bg-paper-white transition-all"
@@ -174,7 +189,23 @@ export default function WritingPage() {
             onClose={() => setToast({ ...toast, show: false })}
           />
         )}
+
+        {/* Clear Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showClearConfirm}
+          title="清空内容"
+          message="确定要清空当前内容吗？此操作无法撤销。"
+          confirmText="清空"
+          cancelText="取消"
+          variant="warning"
+          onConfirm={() => {
+            setContent('');
+            setShowClearConfirm(false);
+            setToast({ show: true, message: '内容已清空', type: 'success' });
+          }}
+          onCancel={() => setShowClearConfirm(false)}
+        />
       </div>
-    </div>
+    </main>
   );
 }

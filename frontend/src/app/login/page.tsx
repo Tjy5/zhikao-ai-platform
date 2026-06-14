@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useFormValidation } from '../../hooks/useFormValidation';
 import Input from '../../components/ui/Input';
@@ -17,17 +17,10 @@ interface LoginLocationState {
 }
 
 export default function LoginPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const { login, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-
-  // Redirect if already authenticated
-  if (isAuthenticated) {
-    const from = (location.state as LoginLocationState | null)?.from?.pathname || '/app/writing';
-    navigate(from, { replace: true });
-  }
 
   const { values, errors, touched, handleChange, handleBlur, validate } = useFormValidation<LoginFormData>(
     {
@@ -55,6 +48,12 @@ export default function LoginPage() {
     ]
   );
 
+  // Redirect if already authenticated (using Navigate component, not imperative navigate in render)
+  if (isAuthenticated) {
+    const from = (location.state as LoginLocationState | null)?.from?.pathname || '/app/writing';
+    return <Navigate to={from} replace />;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError(null);
@@ -67,8 +66,7 @@ export default function LoginPage() {
 
     try {
       await login(values.usernameOrEmail.trim(), values.password, values.rememberMe);
-      const from = (location.state as LoginLocationState | null)?.from?.pathname || '/app/writing';
-      navigate(from, { replace: true });
+      // Navigation will happen via the Navigate component above after auth state updates
     } catch (error) {
       setIsLoading(false);
       if (error instanceof AppError) {
@@ -86,7 +84,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-paper-white flex items-center justify-center px-4 py-8">
+    <main id="main-content" className="min-h-screen bg-paper-white flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
@@ -129,16 +127,18 @@ export default function LoginPage() {
             />
 
             <div className="flex items-center">
-              <input
-                id="remember-me"
-                type="checkbox"
-                checked={values.rememberMe}
-                onChange={(e) => handleChange('rememberMe', e.target.checked)}
-                className="h-4 w-4 text-vermilion focus:ring-vermilion border-slate-gray/30 rounded"
-                disabled={isLoading}
-              />
-              <label htmlFor="remember-me" className="ml-2 text-sm text-slate-gray">
-                记住我
+              <label htmlFor="remember-me" className="flex items-center gap-2 cursor-pointer p-3 -m-3">
+                <input
+                  id="remember-me"
+                  type="checkbox"
+                  checked={values.rememberMe}
+                  onChange={(e) => handleChange('rememberMe', e.target.checked)}
+                  className="h-4 w-4 text-vermilion focus:ring-vermilion border-slate-gray/30 rounded"
+                  disabled={isLoading}
+                />
+                <span className="text-sm text-slate-gray">
+                  记住我
+                </span>
               </label>
             </div>
 
@@ -157,6 +157,6 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

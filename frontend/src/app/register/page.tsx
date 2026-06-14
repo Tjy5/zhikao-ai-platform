@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useFormValidation } from '../../hooks/useFormValidation';
 import { isValidEmail, isValidUsername, isValidPassword } from '../../utils/validation';
@@ -15,10 +15,10 @@ interface RegisterFormData {
 }
 
 export default function RegisterPage() {
-  const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [redirectToSettings, setRedirectToSettings] = useState(false);
 
   const { values, errors, touched, handleChange, handleBlur, validate } = useFormValidation<RegisterFormData>(
     {
@@ -69,6 +69,11 @@ export default function RegisterPage() {
     ]
   );
 
+  // Redirect if already authenticated (using Navigate component)
+  if (isAuthenticated) {
+    return <Navigate to={redirectToSettings ? '/app/settings' : '/app/writing'} replace />;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError(null);
@@ -78,6 +83,7 @@ export default function RegisterPage() {
     }
 
     setIsLoading(true);
+    setRedirectToSettings(true);
 
     try {
       await register(
@@ -85,10 +91,10 @@ export default function RegisterPage() {
         values.email.trim().toLowerCase(),
         values.password
       );
-      // Auto-login on success, then redirect
-      navigate('/app/settings', { replace: true });
+      // Navigation will happen via the Navigate component above after auth state updates
     } catch (error) {
       setIsLoading(false);
+      setRedirectToSettings(false);
       if (error instanceof AppError) {
         const details = error.details as { status?: unknown } | undefined;
         if (details?.status === 409) {
@@ -105,7 +111,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-paper-white flex items-center justify-center px-4 py-8">
+    <main id="main-content" className="min-h-screen bg-paper-white flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
@@ -186,6 +192,6 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
