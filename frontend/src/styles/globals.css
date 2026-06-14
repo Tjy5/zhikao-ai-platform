@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Color tokens */
+    --color-deep-ink: #2C3137;
+    --color-vermilion: #C7432F;
+    --color-slate-gray: #5B6B79;
+    --color-paper-white: #FAFAF9;
+    --color-card-cream: #F5F0E8;
+    --color-success-ink: #2D5A3D;
+    --color-warning-amber: #D97706;
+    --color-error-crimson: #DC2626;
+  }
+
+  * {
+    @apply border-slate-gray/20;
+  }
+
+  body {
+    @apply bg-paper-white text-deep-ink antialiased font-body;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-medium;
+  }
+
+  /* Focus styles */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    @apply outline-none ring-2 ring-vermilion ring-offset-2 ring-offset-paper-white;
+  }
+}
+
+@layer utilities {
+  /* Custom transitions */
+  .transition-smooth {
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Toast animation */
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

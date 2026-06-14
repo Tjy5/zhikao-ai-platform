@@ -1,72 +1,75 @@
-import type { ButtonHTMLAttributes, ReactElement } from 'react';
-import { Children, cloneElement, isValidElement } from 'react';
-import { cn } from '@/lib/utils';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-const variantClasses = {
-  default: 'border-ink bg-ink text-paper shadow-sm hover:bg-ink-light',
-  primary: 'border-ink bg-ink text-paper shadow-sm hover:bg-ink-light',
-  destructive: 'border-seal-red bg-seal-red text-paper shadow-sm hover:bg-seal',
-  outline:
-    'border-ink-light/20 bg-paper text-ink shadow-sm hover:border-ink hover:bg-paper-ivory',
-  secondary:
-    'border-ink-light/20 bg-paper-rice text-ink shadow-sm hover:border-ink hover:bg-paper',
-  ghost:
-    'border-transparent bg-transparent text-ink shadow-none hover:border-ink-light/15 hover:bg-paper-ivory/80',
-  link: 'border-transparent bg-transparent text-ink shadow-none underline-offset-4 hover:underline',
-} as const;
-
-const sizeClasses = {
-  default: 'h-11 px-5 py-2',
-  sm: 'h-9 px-4 text-xs',
-  lg: 'h-12 px-8 text-base',
-  icon: 'h-11 w-11 p-0',
-} as const;
-
-type ButtonVariant = keyof typeof variantClasses;
-type ButtonSize = keyof typeof sizeClasses;
-
-export interface ButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
-  fullWidth?: boolean;
-  asChild?: boolean;
-  children: ReactElement | ReactElement[] | string;
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'ghost';
+  size?: 'sm' | 'md' | 'lg';
+  isLoading?: boolean;
+  children: ReactNode;
 }
 
-const Button = ({
-  variant = 'default',
-  size = 'default',
-  fullWidth,
-  asChild,
-  className,
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  isLoading = false,
+  disabled,
   children,
-  type = 'button',
-  ...rest
-}: ButtonProps) => {
-  const classes = cn(
-    'ink-hover inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[6px] border font-kaishu text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-seal focus-visible:ring-offset-2 focus-visible:ring-offset-paper hover:-translate-y-[1px] active:translate-x-[1px] active:translate-y-[1px] disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-50',
-    variantClasses[variant],
-    sizeClasses[size],
-    fullWidth && 'w-full',
-    className
-  );
+  className = '',
+  ...props
+}: ButtonProps) {
+  const baseStyles = 'font-medium rounded-md transition-smooth focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
-  if (
-    asChild &&
-    Children.count(children) === 1 &&
-    isValidElement<{ className?: string }>(children)
-  ) {
-    return cloneElement(children, {
-      className: cn(children.props.className, classes),
-    });
-  }
+  const variantStyles = {
+    primary: 'bg-vermilion text-paper-white hover:bg-vermilion/90 focus:ring-vermilion',
+    secondary: 'bg-card-cream text-deep-ink hover:bg-card-cream/80 focus:ring-slate-gray',
+    ghost: 'bg-transparent text-vermilion hover:bg-vermilion/10 focus:ring-vermilion',
+  };
+
+  const sizeStyles = {
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-base',
+    lg: 'px-6 py-3 text-lg',
+  };
 
   return (
-    <button type={type} className={classes} {...rest}>
-      {children}
+    <button
+      className={`
+        ${baseStyles}
+        ${variantStyles[variant]}
+        ${sizeStyles[size]}
+        ${className}
+      `}
+      disabled={disabled || isLoading}
+      {...props}
+    >
+      {isLoading ? (
+        <span className="flex items-center justify-center">
+          <svg
+            className="animate-spin -ml-1 mr-2 h-4 w-4"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          加载中...
+        </span>
+      ) : (
+        children
+      )}
     </button>
   );
-};
+}
 
 export default Button;

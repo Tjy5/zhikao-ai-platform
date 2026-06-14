@@ -102,6 +102,12 @@ public class WritingController {
     return historyService.clear(currentUser(authentication).id());
   }
 
+  @DeleteMapping("/history/{id}")
+  public Map<String, Integer> deleteHistoryItem(
+      Authentication authentication, @PathVariable String id) {
+    return historyService.delete(currentUser(authentication).id(), id);
+  }
+
   private static CurrentUser currentUser(Authentication authentication) {
     return (CurrentUser) authentication.getPrincipal();
   }

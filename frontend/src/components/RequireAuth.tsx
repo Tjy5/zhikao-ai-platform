@@ -1,24 +1,32 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
-import { useAuth } from '../auth/AuthContext';
+interface RequireAuthProps {
+  children: ReactNode;
+}
 
-export default function RequireAuth({ children }: { children: ReactNode }) {
+export function RequireAuth({ children }: RequireAuthProps) {
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
-  const { isAuthenticated, status } = useAuth();
 
-  if (status === 'loading') {
+  if (isLoading) {
     return (
-      <div className='flex min-h-screen items-center justify-center bg-paper font-kaishu text-lg text-ink'>
-        正在验证登录状态
+      <div className="min-h-screen flex items-center justify-center bg-paper-white">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-vermilion border-r-transparent"></div>
+          <p className="mt-4 text-slate-gray">加载中...</p>
+        </div>
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    const next = encodeURIComponent(location.pathname + location.search);
-    return <Navigate to={`/login?next=${next}`} replace />;
+    // Redirect to login, but save the attempted location
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
 }
+
+export default RequireAuth;

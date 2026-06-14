@@ -71,6 +71,10 @@ public class HistoryService {
     return Map.of("deleted", history.clearByUserId(userId));
   }
 
+  public Map<String, Integer> delete(long userId, String id) {
+    return Map.of("deleted", history.deleteById(userId, id));
+  }
+
   private Map<String, Object> summary(HistoryRecord record) {
     Map<String, Object> item = base(record);
     item.put("taskType", record.taskType());

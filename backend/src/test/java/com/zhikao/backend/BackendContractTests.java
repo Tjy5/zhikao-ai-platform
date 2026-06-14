@@ -358,6 +358,62 @@ class BackendContractTests extends IntegrationTestSupport {
   }
 
   @Test
+  void historySingleDeleteIsUserScopedAndIdempotent() throws Exception {
+    Session userA = registerAndLogin("delA");
+    Session userB = registerAndLogin("delB");
+    saveSettings(userA, "https://provider.example.com/v1", "writing-model", "sk-a").andExpect(status().isOk());
+    saveSettings(userB, "https://provider.example.com/v1", "writing-model", "sk-b").andExpect(status().isOk());
+
+    postGrade(userA).andExpect(status().isOk());
+    postGrade(userB).andExpect(status().isOk());
+
+    String itemA =
+        json(
+                mockMvc
+                    .perform(get("/api/v1/writings/history").header("Authorization", userA.authHeader()))
+                    .andExpect(status().isOk())
+                    .andReturn())
+            .path("items")
+            .get(0)
+            .path("id")
+            .asText();
+    String itemB =
+        json(
+                mockMvc
+                    .perform(get("/api/v1/writings/history").header("Authorization", userB.authHeader()))
+                    .andExpect(status().isOk())
+                    .andReturn())
+            .path("items")
+            .get(0)
+            .path("id")
+            .asText();
+    assertThat(itemA).isNotEqualTo(itemB);
+
+    mockMvc
+        .perform(delete("/api/v1/writings/history/" + itemB).header("Authorization", userA.authHeader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.deleted").value(0));
+    mockMvc
+        .perform(get("/api/v1/writings/history").header("Authorization", userB.authHeader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].id").value(itemB));
+
+    mockMvc
+        .perform(delete("/api/v1/writings/history/" + itemA).header("Authorization", userA.authHeader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.deleted").value(1));
+    mockMvc
+        .perform(get("/api/v1/writings/history").header("Authorization", userA.authHeader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items").isEmpty());
+
+    mockMvc
+        .perform(delete("/api/v1/writings/history/" + itemA).header("Authorization", userA.authHeader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.deleted").value(0));
+  }
+
+  @Test
   void configuredCorsOriginIsAllowed() throws Exception {
     mockMvc
         .perform(

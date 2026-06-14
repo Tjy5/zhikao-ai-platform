@@ -1,22 +1,10 @@
-'use client';
-
-import AboutSection from './_home/components/AboutSection';
-import CollectionSection from './_home/components/CollectionSection';
-import FinalCtaSection from './_home/components/FinalCtaSection';
-import HeroSection from './_home/components/HeroSection';
-import TextureOverlay from './_home/components/TextureOverlay';
-import { useHomeStats } from './_home/hooks/useHomeStats';
-
 export default function HomePage() {
-  const stats = useHomeStats();
-
   return (
-    <div className='min-h-screen overflow-x-hidden bg-paper text-ink'>
-      <HeroSection stats={stats} />
-      <AboutSection />
-      <CollectionSection stats={stats} />
-      <FinalCtaSection />
-      <TextureOverlay />
+    <div className="min-h-screen bg-paper-white">
+      <div className="max-w-content mx-auto px-4 py-8">
+        <h1 className="text-2xl font-display text-vermilion">墨评AI</h1>
+        <p className="mt-4 text-slate-gray">Home page (to be implemented)</p>
+      </div>
     </div>
   );
 }

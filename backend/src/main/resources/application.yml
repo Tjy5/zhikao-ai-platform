@@ -18,7 +18,7 @@ spring:
 
 app:
   debug: ${DEBUG:false}
-  cors-origins: ${BACKEND_CORS_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+  cors-origins: ${BACKEND_CORS_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://localhost:5174}
   secret-key: ${APP_SECRET_KEY:dev-only-change-me}
   access-token-expire-minutes: ${ACCESS_TOKEN_EXPIRE_MINUTES:60}
   model-settings-encryption-key: ${MODEL_SETTINGS_ENCRYPTION_KEY:dev-only-model-settings-key-change-me}

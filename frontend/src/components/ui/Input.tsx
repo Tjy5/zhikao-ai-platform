@@ -1,24 +1,57 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
+import type { InputHTMLAttributes } from 'react';
+import { forwardRef } from 'react';
 
-export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {}
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
+  error?: string;
+  helperText?: string;
+}
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ label, error, helperText, className = '', id, ...props }, ref) => {
+    const inputId = id || `input-${label?.toLowerCase().replace(/\s+/g, '-')}`;
+
     return (
-      <input
-        type={type}
-        className={cn(
-          'retained-input flex h-12 w-full rounded-[6px] border border-ink-light/20 bg-paper-ivory px-4 py-3 text-sm font-medium text-foreground shadow-sm transition-all placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
-          className
+      <div className="w-full">
+        {label && (
+          <label
+            htmlFor={inputId}
+            className="block text-sm font-medium text-deep-ink mb-2"
+          >
+            {label}
+          </label>
         )}
-        ref={ref}
-        {...props}
-      />
+        <input
+          ref={ref}
+          id={inputId}
+          className={`
+            w-full px-4 py-2 rounded-md border transition-smooth
+            bg-paper-white text-deep-ink
+            placeholder:text-slate-gray/50
+            focus:outline-none focus:ring-2 focus:ring-vermilion focus:border-vermilion
+            disabled:opacity-50 disabled:cursor-not-allowed
+            ${error ? 'border-error-crimson' : 'border-slate-gray/30'}
+            ${className}
+          `}
+          aria-invalid={error ? 'true' : 'false'}
+          aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
+          {...props}
+        />
+        {error && (
+          <p id={`${inputId}-error`} className="mt-1 text-sm text-error-crimson">
+            {error}
+          </p>
+        )}
+        {!error && helperText && (
+          <p id={`${inputId}-helper`} className="mt-1 text-sm text-slate-gray">
+            {helperText}
+          </p>
+        )}
+      </div>
     );
   }
 );
+
 Input.displayName = 'Input';
 
-export { Input };
+export default Input;

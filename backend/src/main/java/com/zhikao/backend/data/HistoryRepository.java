@@ -80,6 +80,13 @@ public class HistoryRepository {
     return count == null ? 0 : count;
   }
 
+  public int deleteById(long userId, String id) {
+    return jdbc.sql("delete from history where user_id = :userId and id = :id")
+        .param("userId", userId)
+        .param("id", id)
+        .update();
+  }
+
   private static HistoryRecord map(ResultSet rs, int rowNum) throws SQLException {
     return new HistoryRecord(
         rs.getString("id"),
