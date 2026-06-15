@@ -1,6 +1,6 @@
 # 部署指南
 
-本文档描述如何将墨评AI前端应用部署到生产环境。
+本文档描述如何将成公前端应用部署到生产环境。
 
 ## 部署前检查清单
 
@@ -227,7 +227,7 @@ sudo systemctl reload nginx
 
 **本地开发**：创建 `.env` 文件
 ```bash
-VITE_API_URL=http://localhost:8080
+VITE_API_URL=http://localhost:8001
 ```
 
 **生产环境**：

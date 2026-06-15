@@ -7,11 +7,13 @@ import { useAuth } from '../hooks/useAuth';
 /**
  * / — LandingPage. design.md §10.11 + direction-v3-home.html (visual truth).
  *
- * Public page: renders its own `<CommandBar variant="public">` and
- * `<main id="main-content">` (the global skip-link target). It makes NO
- * authenticated API calls — it is pure presentational marketing that mirrors
- * the real product's report-card structure. Auth-aware CTAs route logged-in
- * users into the workspace instead of asking them to register again.
+ * Public page: renders its own `<CommandBar>` (variant flips to `app` when the
+ * visitor is already logged in, so the 首页/概览/... nav stays consistent instead
+ * of swapping to the public 登录/免费开始 bar) and `<main id="main-content">`
+ * (the global skip-link target). It makes NO authenticated API calls — it is
+ * pure presentational marketing that mirrors the real product's report-card
+ * structure. Auth-aware CTAs route logged-in users into the workspace instead
+ * of asking them to register again.
  *
  * Composition (matches direction-v3-home.html section-for-section):
  *  1. Hero — left thesis (结构化批改 in oxblood) + value line + CTA + trust
@@ -212,7 +214,8 @@ export default function LandingPage() {
   const { isAuthenticated } = useAuth();
 
   // Auth-aware CTAs: logged-in users go straight into the workspace instead of
-  // being asked to register. The public CommandBar stays the same either way.
+  // being asked to register. The CommandBar variant also flips to `app` for
+  // logged-in users (see the <CommandBar> below) so the nav stays consistent.
   const heroCtaTo = isAuthenticated ? '/app/writing' : '/register';
   const heroCtaLabel = isAuthenticated ? '去写作台' : '免费开始第一篇';
   const finalCtaTo = isAuthenticated ? '/app/writing' : '/register';
@@ -223,7 +226,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-paper flex flex-col">
-      <CommandBar variant="public" />
+      <CommandBar variant={isAuthenticated ? 'app' : 'public'} />
 
       <main id="main-content" className="flex-1 text-ink">
         {/* ===== HERO ===== */}

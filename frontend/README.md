@@ -1,276 +1,183 @@
-# Frontend - 墨评AI
+# Frontend - 成公
 
-专业的AI写作批改前端应用，基于React 19 + TypeScript + Vite构建。
+成公（智能公考学习平台）的申论写作 AI 结构化批阅前端，基于 React 19 + TypeScript + Vite 构建。视觉方向为锁定的「成公」设计系统（OKLCH token、深色顶栏、纯无衬线、oxblood CTA、朱砂强调）。
 
 ## 技术栈
 
 - **运行时**: React 19 + React Router v7
-- **语言**: TypeScript 6.0 (strict mode)
+- **语言**: TypeScript（strict mode）
 - **构建工具**: Vite 8
-- **样式**: Tailwind CSS 3.4
-- **状态管理**: React Context API
-- **Markdown渲染**: react-markdown 10
+- **样式**: Tailwind CSS（OKLCH 设计 token，无 CSS 模块 / styled-components）
+- **状态管理**: React Context（AuthContext / SettingsContext）
+- **Markdown 渲染**: 自研 5 段报告组件（`components/grading/`），无第三方 markdown 库
 
 ## 项目特性
 
-- 🎨 现代简洁的设计系统（Vermilion + Deep Ink配色）
-- 🔐 完整的JWT认证流程（注册/登录/自动登录/记住我）
-- ⚙️ AI配置管理（模型发现/连接测试/加密存储）
-- ✍️ 写作批改进度UI（SSE连接已实现；后端当前为一次性返回模式）
-- 📚 历史记录管理（时间筛选/内容搜索/清空历史）
-- 📱 响应式设计（支持移动端/平板/桌面）
-- ♿ 可访问性支持（WCAG 2.1 AA标准）
-
-**注意**: SSE进度UI前端已完整实现（进度条、阶段指示器、自动重连），但后端当前为同步执行后一次性返回。待后端改造为真正的流式输出后，前端无需修改即可支持实时进度更新。
+- 🎨 锁定的成公设计系统（OKLCH token + 深色顶栏 + 纯无衬线 + oxblood CTA + 朱砂批改标记）
+- 🔐 完整 JWT 认证流程（注册 / 登录 / 自动登录 / 记住我 / 401→登录跳转）
+- ⚙️ AI 配置管理（模型发现 / 连接测试 / API key 加密保存 + 脱敏返回 / 5-min 缓存）
+- ✍️ 申论写作 + SSE 结构化批阅（5 段报告；SSE 卸载 abort + **禁自动重连**，计费安全）
+- 📚 历史记录管理（时间筛选 / 内容搜索 / 单删 / 批删 / 清空）
+- 📱 响应式（375 / 768 / 1024 / 1440）
+- ♿ 可访问性（WCAG 2.1 AA 对比度；键盘焦点；跳转链接；reduced-motion）
 
 ## 前置要求
 
-- Node.js ≥ 18.0.0
-- npm ≥ 9.0.0
-- 后端API服务运行在 `http://localhost:8080`
+- Node.js ≥ 18
+- 后端 API 运行在 `http://localhost:8001`
 
 ## 快速开始
 
-### 1. 安装依赖
-
 ```bash
 cd frontend
-npm install
+npm install      # 仅首次
+npm run dev      # http://localhost:5173
 ```
 
-### 2. 配置环境变量
-
-创建 `.env` 文件（可选，默认值已配置）：
+默认值开箱互通：前端 API baseURL 默认 `http://localhost:8001`，后端 CORS 已含 `localhost:5173`，无需 `.env`。如需改后端地址，设 `VITE_API_URL`。
 
 ```bash
-# 后端API地址（默认: http://localhost:8080）
-VITE_API_URL=http://localhost:8080
-```
-
-### 3. 启动开发服务器
-
-```bash
-npm run dev
-```
-
-应用将在 `http://localhost:5173` 启动
-
-### 4. 构建生产版本
-
-```bash
-npm run build
-```
-
-构建产物位于 `dist/` 目录
-
-### 5. 预览生产版本
-
-```bash
-npm run preview
+npm run build    # 生产构建（tsc -b + vite build）
+npm run preview  # 预览生产构建
+npm run lint     # ESLint（基线 0 problems）
 ```
 
 ## 可用命令
 
 | 命令 | 说明 |
 |------|------|
-| `npm run dev` | 启动开发服务器（端口5173） |
-| `npm run build` | 构建生产版本 |
+| `npm run dev` | 启动开发服务器（端口 5173） |
+| `npm run build` | 类型检查 + 生产构建 |
 | `npm run preview` | 预览生产构建 |
-| `npm run lint` | 运行ESLint检查 |
+| `npm run lint` | ESLint 检查（基线 0） |
+
+## 设计系统
+
+权威来源：`.trellis/tasks/06-14-frontend-rebuild/design.md` §2 + 根 `DESIGN.md`。token 在 `tailwind.config.js` 定义、`globals.css` 镜像为 CSS 变量。
+
+### 颜色（OKLCH）
+
+| 名称 | 值 | 用途 |
+|------|------|------|
+| `shell` | `oklch(0.235 0.016 262)` | 深色顶栏背景 |
+| `shell-txt` | `oklch(0.92 0.006 250)` | 顶栏文本 |
+| `paper` | `oklch(0.985 0.003 240)` | 工作区主背景（近白，非米色） |
+| `panel` | `oklch(0.965 0.005 240)` | 卡片 / 面板背景 |
+| `ink` | `oklch(0.24 0.02 262)` | 主要文本 |
+| `mute` | `oklch(0.47 0.014 262)` | 次要 / 信息性文本（过 AA） |
+| `faint` | `oklch(0.60 0.012 262)` | **仅装饰**（分隔符 / 占位 / aria-hidden 图标） |
+| `oxblood` | `oklch(0.42 0.12 25)` | CTA 主操作色 |
+| `mark` | `oklch(0.56 0.17 32)` | 朱砂强调（批改标记 / 状态，非通用 CTA） |
+| `ok` | `oklch(0.50 0.11 155)` | 成功 / 就绪 |
+| `warn` | `oklch(0.54 0.13 60)` | 警告（已加深过 AA） |
+| `line` | `oklch(0.90 0.006 240)` | 分隔线 |
+
+> 旧 cream / paper-white / slate-gray / deep-ink / vermilion-as-CTA 配色（墨评AI / 墨韵方向）已**全部移除**，禁止重新引入。
+
+### 字体（纯无衬线）
+
+- **sans（正文 + 标题）**: Inter + Noto Sans SC（**无衬线体**——Noto Serif SC 已删除）
+- **mono**: JetBrains Mono
 
 ## 项目结构
 
 ```
 frontend/
 ├── src/
-│   ├── app/                      # 页面组件
-│   │   ├── page.tsx              # 首页
-│   │   ├── login/                # 登录页
-│   │   ├── register/             # 注册页
-│   │   ├── writing/              # 写作与批改页
-│   │   │   ├── page.tsx          # 写作输入页
-│   │   │   └── grading/page.tsx  # 批改进度页
-│   │   ├── history/              # 历史记录页
-│   │   └── settings/             # 设置页
-│   ├── components/               # 可复用组件
-│   │   ├── ui/                   # 基础UI组件（Button, Input, Toast等）
-│   │   └── RequireAuth.tsx       # 路由保护组件
-│   ├── contexts/                 # React Contexts
-│   │   └── AuthContext.tsx       # 认证状态管理
-│   ├── hooks/                    # 自定义Hooks
-│   │   ├── useAuth.ts            # 认证hook
-│   │   ├── useFormValidation.ts  # 表单验证hook
-│   │   ├── useSSE.ts             # SSE连接hook
-│   │   └── useToast.ts           # Toast通知hook
-│   ├── services/                 # API服务层
-│   │   ├── apiClient.ts          # 基础API客户端
-│   │   ├── authService.ts        # 认证API
-│   │   ├── settingsService.ts    # 设置API
-│   │   └── writingService.ts     # 写作批改API
-│   ├── types/                    # TypeScript类型定义
-│   │   ├── api.ts                # API响应类型
-│   │   └── domain.ts             # 领域模型类型
-│   ├── utils/                    # 工具函数
-│   │   ├── formatRelativeTime.ts # 相对时间格式化
-│   │   └── validation.ts         # 表单验证工具
-│   ├── styles/
-│   │   └── globals.css           # 全局样式（Tailwind配置）
-│   ├── App.tsx                   # 根组件
-│   └── main.tsx                  # 入口文件
-├── public/                       # 静态资源
-├── index.html                    # HTML模板
-├── vite.config.ts                # Vite配置
-├── tailwind.config.js            # Tailwind配置
-├── tsconfig.json                 # TypeScript配置
-└── package.json                  # 项目依赖
+│   ├── app/                      # 页面
+│   │   ├── page.tsx              # 落地页 /
+│   │   ├── login/ register/      # 认证页
+│   │   ├── dashboard/            # 概览 /app
+│   │   ├── writing/              # 写作台 + 批阅 /app/writing(/grading)
+│   │   ├── history/              # 批改历史 /app/history
+│   │   └── settings/             # AI 配置 /app/settings
+│   ├── components/
+│   │   ├── ui/                   # 基础组件（Button/Input/Pin/Toast/ConfirmDialog/EmptyState/Skeleton）
+│   │   ├── grading/              # 批阅（StageTrace/GradingReport/StructuredReport）
+│   │   ├── CommandBar.tsx        # 顶栏（app/public 变体）
+│   │   ├── AppLayout.tsx         # /app 外壳
+│   │   ├── RequireAuth.tsx       # 路由保护
+│   │   └── ApiClientSync.tsx     # 401→登录路由桥
+│   ├── contexts/                 # AuthContext / SettingsContext
+│   ├── hooks/                    # useAuth / useSettings / useSSE / useFormValidation
+│   ├── services/                 # apiClient / auth / settings / writing
+│   ├── types/                    # api.ts / domain.ts
+│   └── utils/                    # parseFeedback / feedbackDisplay / formatRelativeTime / structuredScoringPref
+├── index.html
+├── tailwind.config.js            # 设计 token（唯一真源）
+└── vite.config.ts
 ```
 
-## 设计系统
+## API 集成
 
-### 颜色系统
+通过 `apiClient`（自动注入 JWT、统一错误分类、401 钩子）调用：
 
-| 名称 | 色值 | 用途 |
-|------|------|------|
-| Deep Ink | `#2C3137` | 主要文本 |
-| Vermilion | `#C7432F` | 主色调（批改标记、CTA） |
-| Slate Gray | `#5B6B79` | 次要文本 |
-| Paper White | `#FAFAF9` | 主背景 |
-| Card Cream | `#F5F0E8` | 卡片背景 |
-| Success Ink | `#2D5A3D` | 成功状态 |
-| Warning Amber | `#D97706` | 警告状态 |
-| Error Crimson | `#DC2626` | 错误状态 |
+### 认证
+- `POST /api/v1/auth/register` · `POST /api/v1/auth/login` · `GET /api/v1/auth/me`
 
-### 字体系统
+### AI 配置
+- `GET /api/v1/settings/writing-ai` · `PUT /api/v1/settings/writing-ai`
+- `POST /api/v1/settings/writing-ai/models`（发现）· `POST /api/v1/settings/writing-ai/test`（测试）
 
-- **Display（标题）**: Noto Serif SC（思源宋体）
-- **Body（正文）**: Inter
-- **Mono（代码）**: JetBrains Mono
-
-### 布局系统
-
-- **8px网格系统**: 所有间距为8的倍数
-- **圆角**: 4px (sm) / 8px (md) / 12px (lg)
-- **最大宽度**: 1120px（内容区）
+### 写作 / 历史
+- `POST /api/v1/writings/grade-progressive`（SSE 批阅）
+- `GET /api/v1/writings/history[?limit]` · `GET /api/v1/writings/history/{id}`
+- `DELETE /api/v1/writings/history`（清空）· `DELETE /api/v1/writings/history/{id}`（单删）
 
 ## 环境变量
 
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `VITE_API_URL` | `http://localhost:8080` | 后端API基础地址 |
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `VITE_API_URL` | `http://localhost:8001` | 后端 API 基础地址 |
 
-## API集成
+## SSE 批阅（计费关键）
 
-前端通过以下API与后端通信：
+`useSSE` hook 用 `fetch` + `ReadableStream`（POST，非 EventSource）。两条硬约束：
 
-### 认证相关
-- `POST /api/v1/auth/register` - 用户注册
-- `POST /api/v1/auth/login` - 用户登录
-- `GET /api/v1/auth/me` - 获取当前用户信息
-
-### 设置相关
-- `GET /api/v1/settings/writing-ai` - 获取AI配置
-- `PUT /api/v1/settings/writing-ai` - 更新AI配置
-- `POST /api/v1/settings/writing-ai/models` - 发现可用模型
-- `POST /api/v1/settings/writing-ai/test` - 测试连接
-
-### 写作相关
-- `POST /api/v1/writings/grade-progressive` - SSE渐进式批改
-- `GET /api/v1/writings/history` - 获取历史记录列表
-- `GET /api/v1/writings/history/{id}` - 获取历史记录详情
-- `DELETE /api/v1/writings/history` - 清空全部历史
-
-所有认证请求自动携带JWT token（存储在localStorage）。
-
-## 浏览器支持
-
-- Chrome/Edge ≥ 90
-- Firefox ≥ 88
-- Safari ≥ 14
-- 移动端浏览器（iOS Safari, Chrome Android）
-
-## 性能指标
-
-- **构建产物大小**: ~420KB JS + ~20KB CSS (gzip后 ~128KB + ~5KB)
-- **首屏加载时间**: <2秒（3G网络）
-- **运行时性能**: React 19优化，最小重渲染
-
-## 可访问性
-
-- ✅ WCAG 2.1 AA标准
-- ✅ 键盘导航支持（Tab/Enter/Escape）
-- ✅ 语义化HTML标签
-- ✅ ARIA标签完整
-- ✅ 焦点可见性（2px vermilion outline）
-- ✅ 减少动效支持（prefers-reduced-motion）
-- ✅ 移动端触摸目标≥44x44px
-
-## 开发指南
-
-### 添加新页面
-
-1. 在 `src/app/` 创建新目录
-2. 添加 `page.tsx` 组件
-3. 在 `src/App.tsx` 中配置路由
-4. 如需保护路由，使用 `<RequireAuth>` 包裹
-
-### 添加新API服务
-
-1. 在 `src/types/api.ts` 定义响应类型
-2. 在 `src/services/` 创建服务文件
-3. 使用 `apiClient` 发起请求（自动处理JWT）
-
-### 表单验证
-
-使用 `useFormValidation` hook：
+- **卸载 abort**：组件卸载即 `abort()` 在途请求，无卸载后状态更新。
+- **禁自动重连**：`reconnect` 默认 `false`，批阅页显式传 `false`。重连 = 重复调用 LLM = 重复计费。重试仅由用户显式触发（remount）。
 
 ```typescript
-const { values, errors, handleChange, validate } = useFormValidation(
-  { username: '', password: '' },
-  [
-    { field: 'username', validate: (v) => !v ? '用户名不能为空' : null },
-    { field: 'password', validate: (v) => v.length < 6 ? '密码至少6位' : null },
-  ]
-);
-```
-
-### SSE连接
-
-使用 `useSSE` hook：
-
-```typescript
-const { isConnected, error } = useSSE(url, {
+useSSE({
+  url: '/api/v1/writings/grade-progressive',
   method: 'POST',
-  body: { content: '...' },
-  onMessage: (data) => {
-    // 处理消息
-  },
-  onError: (error) => {
-    // 处理错误
+  body,
+  reconnect: false,            // 计费关键，勿开
+  onMessage, onComplete,
+  onError: (e) => {            // e.status 可用时携带 HTTP 状态
+    if (e.status === 401) apiClient.notifyUnauthorized();
   },
 });
 ```
 
+## 可访问性
+
+- ✅ WCAG 2.1 AA 对比度（信息性文本用 `mute`，`faint` 仅装饰）
+- ✅ 键盘导航（Tab/Enter/Esc）+ 全局焦点环（`outline:2px var(--mark)`）
+- ✅ 语义化 HTML + ARIA + 跳转链接
+- ✅ `prefers-reduced-motion` 降级
+- 触摸目标：button h-9/h-10/h-11（36/40/44px），过 WCAG 2.2 AA（24px）；≥44px（AAA）未追求（与锁定设计冲突）
+
+## 性能
+
+- **构建产物**: ~338 KB JS + ~23 KB CSS（gzip 后 ~102 KB + ~5.7 KB）
+- React 19 + Vite，按页面拆分状态机（loading/empty/error/ready）
+
 ## 故障排查
 
 ### 端口冲突
+5173 被占用时 Vite 自动顺延；看终端输出取实际端口。
 
-如果5173端口被占用，Vite会自动使用下一个可用端口。查看终端输出获取实际端口。
+### CORS
+后端 CORS 须含前端 origin（默认配置已含 `localhost:5173/5174`）。
 
-### CORS错误
+### Token 过期
+`apiClient` 检测 401 → 清 auth + 路由跳 `/login?from=`（经 `ApiClientSync`，**无 `window.location`**）。批阅 SSE 流中的 401 由 `useSSE.onError` 携带状态 → `notifyUnauthorized()`。
 
-确保后端CORS配置包含前端地址：
-- `http://localhost:5173`
-- `http://localhost:5174`（备用端口）
+### SSE 连接中断
+**不会自动重连**（计费设计）。失败显示分类错误 + 手动重试按钮（remount）。卸载即 abort，无泄漏。
 
-### Token过期
-
-前端会自动检测401响应并重定向到登录页。无需手动处理。
-
-### SSE连接中断
-
-`useSSE` hook内置自动重连机制（最多3次，间隔1秒）。
-
-## 部署指南
+## 部署
 
 参见 [DEPLOYMENT.md](./DEPLOYMENT.md)
 
