@@ -4,21 +4,6 @@
 
 本仓库正在向可开源的公考学习平台核心演进。公开仓库不保存未授权题库、真题解析、培训资料或本地私有语料；知识点、原创练习和写作任务通过可审计的内容包机制逐步加入。
 
-## 简历项目定位
-
-这个仓库适合按 **AI 应用工程 / 全栈 AI 产品工程** 项目展示，而不是按普通 CRUD 项目展示。核心亮点是：
-
-- 端到端产品闭环：注册登录、用户级模型配置、写作提交、SSE 批改、历史复盘和设置管理。
-- AI 应用工程边界：OpenAI-compatible provider、模型发现、provider 测试、JSON 兜底开关、失败分类和离线输出合同回归。
-- 安全和隐私边界：BCrypt 密码哈希、HS256 JWT、用户隔离、provider API key 加密保存和响应脱敏。
-- 工程质量证据：Spring Boot contract tests、前端 Vitest 流程测试、内容包治理测试、离线写作反馈 eval fixture、GitHub Actions CI。
-
-可以在简历中概括为：
-
-```text
-构建 React + Spring Boot 全栈 AI 写作反馈平台，支持 JWT 登录、用户级 OpenAI-compatible 模型配置、API key 加密保存、SSE 渐进式批改、历史复盘、内容包治理和离线 LLM 输出合同回归；通过 JUnit/MockMvc、Vitest 和 GitHub Actions 覆盖核心质量门禁。
-```
-
 ## 核心功能
 
 - **首页（落地页 `/`）**：面向访客的产品介绍页——报告卡 hero、写/改/盘/进四步闭环、真实批阅样例，引导注册；已登录用户从顶部导航「首页」也可回到此处（CommandBar 变体按登录态切换）。
@@ -280,24 +265,6 @@ CI 不依赖真实 provider API key，不会访问 OpenAI-compatible 外部服�
 - `APP_SECRET_KEY` 每个部署环境必须独立设置；更换该值会让已签发 token 失效。
 - `MODEL_SETTINGS_ENCRYPTION_KEY` 必须和数据库备份一起纳入密钥备份流程；丢失后，已保存的用户 provider API key 无法解密，只能让用户重新填写。
 - 用户 provider API key 只应通过 `/settings` 保存，不要写入前端 `.env.local`、浏览器存储或提交到仓库。
-
-## 面试讲法
-
-可以重点讲这些工程问题：
-
-- **为什么用 SSE**：写作批改可能耗时较长，SSE 给前端保留渐进式反馈通道；当前实现先发送单个最终事件，未来可以扩展为多阶段进度事件而不改变页面入口。
-- **怎么避免薄 LLM wrapper**：项目把 provider 配置、密钥加密、失败分类、模型发现、provider 测试、历史记录和离线输出合同回归纳入系统边界。
-- **怎么做用户隔离**：后端从 JWT principal 获取 `user_id`，settings/history 查询都按当前用户过滤，客户端不能传入任意用户 ID 访问数据。
-- **怎么处理 AI 失败**：provider failure 被映射为分类、HTTP 状态、retryable 标记和用户消息，SSE 错误事件不会被前端误当成成功结果。
-- **怎么处理公开内容风险**：内容包要求 manifest、许可证、来源策略和审查状态，校验器阻止真实试题、私有语料和旧本地痕迹进入公开 demo。
-- **下一步如何演进**：可以继续加 token/cost/latency 观测、请求限流、eval 报告趋势、线上部署和更细的学习进度模型。
-
-诚实限制：
-
-- 当前没有公开生产部署和真实用户数据，不能在简历中写用户数、可用性或真实延迟指标。
-- 离线 eval 只校验输出结构和基本可用性，不代表真实模型评分准确率。
-- SQLite 适合本地开发和轻量 demo，生产多人高并发场景需要重新评估数据库和连接池策略。
-- 当前 SSE 成功路径发送一个最终事件，不是完整 token-by-token 流式输出。
 
 ## 维护说明
 
