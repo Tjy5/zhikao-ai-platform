@@ -1,8 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 
+/**
+ * Error payload forwarded to `onError`. Evolved from a bare `Event` (Phase 8
+ * SSE-401 cross-layer fix) so consumers can distinguish a real HTTP status
+ * (e.g. 401 → token expired during the grading stream) from a transport-level
+ * failure (DNS / offline / CORS / abort). `status` is undefined for the
+ * EventSource GET branch and for transport failures where no response was
+ * received.
+ */
+export interface SSEErrorEvent {
+  /** HTTP status when the server returned a non-2xx response; undefined for transport-level failures. */
+  status?: number;
+  /** The underlying Error, when available. */
+  error?: Error;
+}
+
 interface UseSSEOptions<TEvent> {
   onMessage: (data: TEvent) => void;
-  onError?: (error: Event) => void;
+  onError?: (error: SSEErrorEvent) => void;
   reconnect?: boolean;
   reconnectDelay?: number;
   headers?: Record<string, string>;
@@ -17,7 +32,20 @@ interface UseSSEReturn {
 }
 
 /**
- * Custom hook for handling Server-Sent Events (SSE)
+ * Internal Error subclass that carries the HTTP status out of the POST branch's
+ * response check, so the catch block can forward it via `onError`.
+ */
+class HttpError extends Error {
+  status: number;
+  constructor(status: number) {
+    super(`HTTP error! status: ${status}`);
+    this.name = 'HttpError';
+    this.status = status;
+  }
+}
+
+/**
+ * Custom hook for handling Server-Sent Events (SSE).
  *
  * Note: For POST requests with SSE, we use fetch with ReadableStream
  * because EventSource only supports GET requests.
@@ -74,7 +102,10 @@ export function useSSE<TEvent = unknown>(
           });
 
           if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            // Carry the HTTP status out via HttpError so the catch block can
+            // forward it. This is the load-bearing change for the Phase 8
+            // SSE-401 fix: previously a bare `new Error(...)` discarded it.
+            throw new HttpError(response.status);
           }
 
           if (!response.body) {
@@ -147,14 +178,17 @@ export function useSSE<TEvent = unknown>(
             }
           };
 
-          eventSource.onerror = (event) => {
+          eventSource.onerror = (_event) => {
             if (isMounted) {
               setIsConnected(false);
               const err = new Error('SSE connection error');
               setError(err);
 
               if (onError) {
-                onError(event);
+                // EventSource errors do not expose an HTTP status; forward an
+                // SSEErrorEvent with no status so the consumer treats it as a
+                // transport-level failure (retryable, not auth).
+                onError({ error: err });
               }
 
               // Attempt reconnect if enabled
@@ -172,12 +206,17 @@ export function useSSE<TEvent = unknown>(
         }
       } catch (err) {
         if (isMounted) {
-          const connectionError = err instanceof Error ? err : new Error('Unknown error');
+          const connectionError =
+            err instanceof Error ? err : new Error('Unknown error');
           setError(connectionError);
           setIsConnected(false);
 
           if (onError) {
-            onError(new Event('error'));
+            // Forward the HTTP status when we have one (HttpError from the
+            // response.ok check) so consumers can react to 401 specifically.
+            const status =
+              err instanceof HttpError ? err.status : undefined;
+            onError({ status, error: connectionError });
           }
 
           // Attempt reconnect if enabled

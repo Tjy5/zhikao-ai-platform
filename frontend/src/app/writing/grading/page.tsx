@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useSSE } from '../../../hooks/useSSE';
+import { useSSE, type SSEErrorEvent } from '../../../hooks/useSSE';
+import { apiClient } from '../../../services/apiClient';
 import { writingService } from '../../../services/writingService';
 import { Button } from '../../../components/ui/Button';
 import { StageTrace } from '../../../components/grading/StageTrace';
@@ -153,12 +154,26 @@ function GradingRun({ content, taskType, onComplete, onError }: GradingRunProps)
   );
 
   const handleError = useCallback(
-    (_event: Event) => {
+    (event: SSEErrorEvent) => {
       if (completedRef.current) return;
+
+      // Phase 8 SSE-401 cross-layer fix. The grading stream issues its own
+      // fetch (useSSE POST branch) and bypasses apiClient.request, so a 401
+      // (token expired mid-stream) used to surface as a generic "网络连接失败".
+      // Route it through the SAME clear-auth + navigate-/login path the rest
+      // of the app uses, via apiClient.notifyUnauthorized() (mirrors
+      // handleResponse's 401 branch). Mark complete first so a late duplicate
+      // event can't flip the view after the redirect.
+      if (event.status === 401) {
+        completedRef.current = true;
+        apiClient.notifyUnauthorized();
+        return;
+      }
+
       completedRef.current = true;
-      // Transport-level failure (DNS / offline / CORS / non-2xx). The hook's
-      // onError doesn't carry the HTTP status, so we classify generically.
-      // Network errors are always retryable.
+      // Transport-level failure (DNS / offline / CORS / non-2xx other than
+      // 401). `status` is undefined for genuine transport errors. Always
+      // retryable — the user can re-submit.
       onError({
         status: '网络连接失败',
         message: '无法连接到服务器，请检查网络后重试。',

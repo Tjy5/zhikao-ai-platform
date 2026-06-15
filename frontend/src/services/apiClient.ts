@@ -31,6 +31,23 @@ class ApiClient {
     this.unauthorizedHandler = handler;
   }
 
+  /**
+   * Trigger the unauthorized flow from OUTSIDE `request()` (e.g. from `useSSE`,
+   * which issues its own fetch for the grading stream and bypasses this client).
+   *
+   * Mirrors exactly what `handleResponse` does on a 401: clears stored tokens,
+   * then invokes the registered handler (wired by `ApiClientSync`) so the app
+   * clears auth state and navigates to `/login?from=<path>` — no
+   * `window.location` hard jump. Safe to call when no handler is registered
+   * (just clears tokens). Phase 8 SSE-401 cross-layer fix.
+   */
+  notifyUnauthorized() {
+    this.clearToken();
+    if (this.unauthorizedHandler) {
+      this.unauthorizedHandler();
+    }
+  }
+
   private getToken(): string | null {
     // Remember-me uses localStorage; session-only uses sessionStorage.
     return localStorage.getItem('token') || sessionStorage.getItem('token');

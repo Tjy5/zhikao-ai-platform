@@ -44,7 +44,11 @@ export default {
         'mark-soft': 'oklch(0.96 0.035 32)',
         // Status
         ok: 'oklch(0.50 0.11 155)',
-        warn: 'oklch(0.62 0.14 72)',
+        // Darkened for WCAG AA contrast as body text (Phase 8 contrast audit).
+        // Was oklch(0.62 0.14 72) which measured 3.38:1 on `panel` (FAIL).
+        // oklch(0.54 0.13 60) measures 4.76:1 on `panel` / 5.04:1 on `paper`
+        // (PASS) while staying recognizably amber/orange for warning semantics.
+        warn: 'oklch(0.54 0.13 60)',
       },
       fontFamily: {
         // Pure sans only — serif is disabled product-wide (design.md §3).

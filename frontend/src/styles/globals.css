@@ -34,9 +34,11 @@
     /* vermilion accent */
     --mark: oklch(0.56 0.17 32);
     --mark-soft: oklch(0.96 0.035 32);
-    /* Status */
+    /* Status. `warn` darkened for WCAG AA body-text contrast (Phase 8 audit):
+       was oklch(0.62 0.14 72) → 3.38:1 on panel (FAIL); now 4.76:1 on panel /
+       5.04:1 on paper (PASS), still amber. */
     --ok: oklch(0.50 0.11 155);
-    --warn: oklch(0.62 0.14 72);
+    --warn: oklch(0.54 0.13 60);
   }
 
   /*
