@@ -247,3 +247,6 @@ frontend-old/
 frontend/*.mjs
 frontend/*.png
 frontend/verification-screenshots/
+
+# Design explorations (local-only design truth; regenerable via frontend/design-shots.mjs)
+design-explorations/
