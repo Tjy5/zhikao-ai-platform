@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth';
  * CommandBar — 成公 dark top command bar. design.md §5 / §10.3.
  *
  * Two variants:
- *  - `app`:    inline nav (首页 / 概览 / 申论写作台 / 批改历史 / AI 配置 — NO 进步轨迹),
+ *  - `app`:    inline nav (首页 / 概览 / 申论学习 / 申论写作台 / 批改历史 / AI 配置 — NO 进步轨迹),
  *              AI-ready indicator (when `aiReady`/`modelName` provided), user
  *              avatar, and the 新建批改 oxblood CTA. Mobile collapses to a
  *              hamburger disclosure.
@@ -32,6 +32,7 @@ interface NavItem {
 const APP_NAV: NavItem[] = [
   { to: '/', label: '首页', end: true },
   { to: '/app', label: '概览', end: true },
+  { to: '/app/study', label: '申论学习' },
   { to: '/app/writing', label: '申论写作台' },
   { to: '/app/history', label: '批改历史' },
   { to: '/app/settings', label: 'AI 配置' },
