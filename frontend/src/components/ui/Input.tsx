@@ -1,57 +1,76 @@
-import type { InputHTMLAttributes } from 'react';
-import { forwardRef } from 'react';
+import type { InputHTMLAttributes, ReactNode } from 'react';
+import { forwardRef, useId } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   helperText?: string;
+  /** Optional trailing affordance (show/hide toggle, copy button, etc.). */
+  trailing?: ReactNode;
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, helperText, className = '', id, ...props }, ref) => {
-    const inputId = id || `input-${label?.toLowerCase().replace(/\s+/g, '-')}`;
+/**
+ * Form Input — design.md §10 (inputs): large enough for study workflows,
+ * visible focus ring (vermilion via :focus-visible), inline validation with
+ * recovery instructions. API key fields use `trailing` for show/hide.
+ */
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { label, error, helperText, trailing, className = '', id, ...props },
+  ref
+) {
+  const generatedId = useId();
+  const inputId = id || generatedId;
+  const helperId = `${inputId}-helper`;
+  const errorId = `${inputId}-error`;
 
-    return (
-      <div className="w-full">
-        {label && (
-          <label
-            htmlFor={inputId}
-            className="block text-sm font-medium text-deep-ink mb-2"
-          >
-            {label}
-          </label>
-        )}
+  return (
+    <div className="w-full">
+      {label && (
+        <label
+          htmlFor={inputId}
+          className="block text-sm font-medium text-ink mb-1.5"
+        >
+          {label}
+        </label>
+      )}
+      <div className="relative">
         <input
           ref={ref}
           id={inputId}
-          className={`
-            w-full px-4 py-2 rounded-md border transition-smooth
-            bg-paper-white text-deep-ink
-            placeholder:text-slate-gray/50
-            focus:outline-none focus:ring-2 focus:ring-vermilion focus:border-vermilion
-            disabled:opacity-50 disabled:cursor-not-allowed
-            ${error ? 'border-error-crimson' : 'border-slate-gray/30'}
-            ${className}
-          `}
-          aria-invalid={error ? 'true' : 'false'}
-          aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
+          className={[
+            'w-full h-11 px-3.5 rounded-md border bg-paper text-ink',
+            'placeholder:text-faint',
+            'transition-ui',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            trailing ? 'pr-11' : '',
+            error
+              ? 'border-mark focus:border-mark'
+              : 'border-line focus:border-ink',
+            className,
+          ].join(' ')}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={
+            error ? errorId : helperText ? helperId : undefined
+          }
           {...props}
         />
-        {error && (
-          <p id={`${inputId}-error`} className="mt-1 text-sm text-error-crimson">
-            {error}
-          </p>
-        )}
-        {!error && helperText && (
-          <p id={`${inputId}-helper`} className="mt-1 text-sm text-slate-gray">
-            {helperText}
-          </p>
+        {trailing && (
+          <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+            {trailing}
+          </div>
         )}
       </div>
-    );
-  }
-);
-
-Input.displayName = 'Input';
+      {error ? (
+        <p id={errorId} className="mt-1.5 text-[13px] text-mark leading-relaxed">
+          {error}
+        </p>
+      ) : helperText ? (
+        <p id={helperId} className="mt-1.5 text-[13px] text-mute leading-relaxed">
+          {helperText}
+        </p>
+      ) : null}
+    </div>
+  );
+});
 
 export default Input;

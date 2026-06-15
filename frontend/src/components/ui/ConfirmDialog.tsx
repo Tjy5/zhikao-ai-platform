@@ -9,9 +9,17 @@ interface ConfirmDialogProps {
   cancelText?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /**
+   * `danger` uses the destructive (vermilion) confirm button — for delete/clear.
+   * `warning` / `info` use the primary (oxblood) confirm button.
+   */
   variant?: 'danger' | 'warning' | 'info';
 }
 
+/**
+ * ConfirmDialog — design.md §10.12. Second-step confirmation for destructive
+ * actions (delete / clear). Consequence copy must be specific.
+ */
 export function ConfirmDialog({
   isOpen,
   title,
@@ -25,111 +33,77 @@ export function ConfirmDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      // Focus trap
-      const focusableElements = dialogRef.current?.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      const firstElement = focusableElements?.[0] as HTMLElement;
-      const lastElement = focusableElements?.[focusableElements.length - 1] as HTMLElement;
+    if (!isOpen) return;
 
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          onCancel();
-        }
+    const focusableSelector =
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-        if (e.key === 'Tab') {
-          if (e.shiftKey) {
-            if (document.activeElement === firstElement) {
-              e.preventDefault();
-              lastElement?.focus();
-            }
-          } else {
-            if (document.activeElement === lastElement) {
-              e.preventDefault();
-              firstElement?.focus();
-            }
-          }
-        }
-      };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel();
+        return;
+      }
+      if (e.key !== 'Tab') return;
 
-      document.addEventListener('keydown', handleKeyDown);
-      firstElement?.focus();
+      const focusable = dialogRef.current?.querySelectorAll(focusableSelector);
+      if (!focusable || focusable.length === 0) return;
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
 
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-      };
-    }
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    // Focus the confirm button by default so Enter confirms; escape/cancel still
+    // reachable. The confirm button is the last focusable element in the dialog
+    // (cancel precedes it in DOM order).
+    const focusable = dialogRef.current?.querySelectorAll(focusableSelector);
+    (focusable?.[focusable.length - 1] as HTMLElement | undefined)?.focus();
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, onCancel]);
 
   if (!isOpen) return null;
 
-  const variantStyles = {
-    danger: 'text-error-crimson',
-    warning: 'text-warning-amber',
-    info: 'text-deep-ink',
-  };
+  const accentText =
+    variant === 'danger' ? 'text-mark' : variant === 'warning' ? 'text-warn' : 'text-ink';
 
-  const variantIcons = {
-    danger: (
-      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-        <path
-          fillRule="evenodd"
-          d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-          clipRule="evenodd"
-        />
-      </svg>
-    ),
-    warning: (
-      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-        <path
-          fillRule="evenodd"
-          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-          clipRule="evenodd"
-        />
-      </svg>
-    ),
-    info: (
-      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-        <path
-          fillRule="evenodd"
-          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-          clipRule="evenodd"
-        />
-      </svg>
-    ),
-  };
+  const confirmVariant = variant === 'danger' ? 'destructive' : 'primary';
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-deep-ink/50 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-ink/50 backdrop-blur-sm px-4"
       onClick={onCancel}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="dialog-title"
+      aria-labelledby="confirm-dialog-title"
     >
       <div
         ref={dialogRef}
-        className="bg-paper-white rounded-lg shadow-lift max-w-md w-full mx-4 p-6"
+        className="bg-paper rounded-lg shadow-[0_10px_30px_-12px_oklch(0.24_0.02_262/0.30)] max-w-md w-full p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start gap-4">
-          <div className={`flex-shrink-0 ${variantStyles[variant]}`}>
-            {variantIcons[variant]}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 id="dialog-title" className="text-lg font-semibold text-deep-ink mb-2">
-              {title}
-            </h3>
-            <p className="text-sm text-slate-gray leading-relaxed">{message}</p>
-          </div>
-        </div>
+        <h3
+          id="confirm-dialog-title"
+          className={`text-lg font-semibold mb-2 ${accentText}`}
+        >
+          {title}
+        </h3>
+        <p className="text-sm text-mute leading-relaxed">{message}</p>
 
         <div className="flex items-center justify-end gap-3 mt-6">
           <Button onClick={onCancel} variant="ghost" size="sm">
             {cancelText}
           </Button>
-          <Button onClick={onConfirm} variant="primary" size="sm">
+          <Button onClick={onConfirm} variant={confirmVariant} size="sm">
             {confirmText}
           </Button>
         </div>

@@ -1,4 +1,23 @@
-// API Response Types (matching backend DTOs)
+/**
+ * API response / request types — MUST match the backend contract.
+ *
+ * Ground-truth backend sources (do not invent fields beyond these):
+ *  - Auth:        backend auth controller / DTOs (register / login / me)
+ *  - Writing:     WritingDtos.java (WritingSubmission, RawWritingFeedbackResult),
+ *                 WritingController.java (grade, grade-progressive SSE shape)
+ *  - History:     HistoryService.java (summary / detail / clear / delete)
+ *  - Settings:    WritingAISettings controller + DTOs
+ *
+ * Load-bearing realities (design.md §9, prd.md backend table):
+ *  - Grading response is a single `content` (markdown) + `contentFormat`.
+ *    The AI system prompt forbids JSON output, so there is NO score / dimensions
+ *    / annotations in the response today.
+ *  - `HistorySummary.score` is STRUCTURALLY ALWAYS NULL: HistoryService.append
+ *    writes `null` and summary() echoes record.score(). Do not render it.
+ *  - `HistorySummary.content` is the grading FEEDBACK markdown, not the user's
+ *    original writing. The original writing only appears in the detail endpoint
+ *    under `request.content`.
+ */
 
 // Auth types
 export interface RegisterRequest {
@@ -113,7 +132,8 @@ export interface HistorySummary {
   timestamp: string;
   type: string; // "grade" | "progressive"
   taskType: string | null;
-  score: number | null; // Always null in current backend data
+  // STRUCTURALLY ALWAYS NULL — HistoryService.append writes null; do not render.
+  score: number | null;
   content: string; // Grading feedback (markdown)
   contentFormat: string;
 }

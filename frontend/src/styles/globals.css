@@ -1,4 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/*
+ * 成公 global styles.
+ * Tokens mirror tailwind.config.js (design.md §2) as CSS variables so raw
+ * <style> blocks / inline styles can reference them without theme().
+ * Serif fonts are disabled product-wide (design.md §3): Inter + Noto Sans SC
+ * for all UI, JetBrains Mono for technical values.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,47 +13,74 @@
 
 @layer base {
   :root {
-    /* Color tokens */
-    --color-deep-ink: #2C3137;
-    --color-vermilion: #C7432F;
-    --color-slate-gray: #5B6B79;
-    --color-paper-white: #FAFAF9;
-    --color-card-cream: #F5F0E8;
-    --color-success-ink: #2D5A3D;
-    --color-warning-amber: #D97706;
-    --color-error-crimson: #DC2626;
+    /* Command bar */
+    --shell: oklch(0.235 0.016 262);
+    --shell-2: oklch(0.28 0.018 262);
+    --shell-line: oklch(0.34 0.02 262);
+    --shell-txt: oklch(0.92 0.006 250);
+    --shell-mute: oklch(0.66 0.012 250);
+    /* Workspace surfaces */
+    --paper: oklch(0.985 0.003 240);
+    --panel: oklch(0.965 0.005 240);
+    --rule: oklch(0.86 0.008 240);
+    --line: oklch(0.90 0.006 240);
+    /* Text */
+    --ink: oklch(0.24 0.02 262);
+    --mute: oklch(0.47 0.014 262);
+    --faint: oklch(0.60 0.012 262);
+    /* Actions */
+    --oxblood: oklch(0.42 0.12 25);
+    --oxblood-ink: oklch(0.34 0.11 25);
+    /* vermilion accent */
+    --mark: oklch(0.56 0.17 32);
+    --mark-soft: oklch(0.96 0.035 32);
+    /* Status */
+    --ok: oklch(0.50 0.11 155);
+    --warn: oklch(0.62 0.14 72);
   }
 
-  * {
-    @apply border-slate-gray/20;
+  /*
+   * Default border color = line token (matches the design system). Tailwind's
+   * preflight otherwise defaults to gray-200, which clashes with OKLCH surfaces.
+   */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--line);
   }
 
   body {
-    @apply bg-paper-white text-deep-ink antialiased font-body;
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: Inter, 'Noto Sans SC', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     line-height: 1.6;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-display font-medium;
+  /* Focus ring — vermilion (mark), visible on every interactive control. */
+  :focus-visible {
+    outline: 2px solid var(--mark);
+    outline-offset: 2px;
   }
 
-  /* Focus styles */
-  button:focus-visible,
-  a:focus-visible,
-  input:focus-visible,
-  textarea:focus-visible,
-  select:focus-visible {
-    @apply outline-none ring-2 ring-vermilion ring-offset-2 ring-offset-paper-white;
+  /* Remove default outline only when the focus ring above applies. */
+  :focus:not(:focus-visible) {
+    outline: none;
   }
 }
 
 @layer utilities {
-  /* Custom transitions */
-  .transition-smooth {
-    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Smooth, short UI transitions. */
+  .transition-ui {
+    transition:
+      background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+      border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+      color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Toast animation */
+  /* Toast entrance. */
   @keyframes slide-in-right {
     from {
       transform: translateX(100%);
@@ -59,15 +93,18 @@
   }
 
   .animate-slide-in-right {
-    animation: slide-in-right 0.3s ease-out;
+    animation: slide-in-right 0.25s ease-out;
   }
 
-  /* Reduced motion support */
+  /* Reduced motion: degrade all animation/transition. */
   @media (prefers-reduced-motion: reduce) {
-    * {
+    *,
+    ::before,
+    ::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 }
