@@ -96,6 +96,23 @@
     animation: slide-in-right 0.25s ease-out;
   }
 
+  /*
+   * Ruled "answer-sheet" textarea background (design.md §10.4). Horizontal
+   * `rule` lines every 2rem; content sits ON the lines (line-height matches).
+   * Used by the WritingDesk editor.
+   */
+  .ruled {
+    background-image: linear-gradient(
+      to bottom,
+      transparent calc(2rem - 1px),
+      var(--rule) calc(2rem - 1px),
+      var(--rule) 2rem
+    );
+    background-size: 100% 2rem;
+    background-position: 0 0.5rem;
+    line-height: 2rem;
+  }
+
   /* Reduced motion: degrade all animation/transition. */
   @media (prefers-reduced-motion: reduce) {
     *,

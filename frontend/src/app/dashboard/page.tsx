@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useSettings } from '../../hooks/useSettings';
 import { Button } from '../../components/ui/Button';
 import { Pin } from '../../components/ui/Pin';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -9,6 +10,7 @@ import writingService from '../../services/writingService';
 import type { HistorySummary } from '../../types/api';
 import { AppError, ErrorType } from '../../types/domain';
 import { formatRelativeTime, formatRelativeTimeShort, isWithinDay } from '../../utils/formatRelativeTime';
+import { extractFeedTitle, extractFeedExcerpt } from '../../utils/feedbackDisplay';
 
 /**
  * /app index — OverviewDashboard. design.md §10.8 + Phase 3.
@@ -74,59 +76,13 @@ function computeStats(items: HistorySummary[]): DashboardStats {
   };
 }
 
-/**
- * Extract a short title-ish label from the feedback markdown.
- *
- * The backend has no title field; the 5-section markdown always starts with
- * `## 任务类型判断` whose first sentence describes the task. We use the first
- * clause (up to the first ，/。/；) trimmed to ~24 chars as a row title.
- * Falls back to "申论批阅记录" when content is empty or unparseable.
- */
-function extractFeedTitle(content: string | null | undefined): string {
-  if (!content) return '申论批阅记录';
-  // Drop the document title if present, then find the first section body.
-  const stripped = content.replace(/^#\s*写作反馈结果\s*\n?/i, '');
-  const sectionMatch = stripped.match(/##\s*任务类型判断\s*\n([\s\S]*?)(?=\n##\s|$)/i);
-  const body = sectionMatch?.[1]?.trim();
-  if (!body) {
-    // Fallback: first non-heading, non-empty line.
-    const firstLine = stripped
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith('#'))
-      .find(Boolean);
-    return firstLine ? truncate(firstLine, 24) : '申论批阅记录';
-  }
-  // First clause: up to the first Chinese/fullwidth sentence terminator.
-  const firstClause = body.split(/[，。；,;]/)[0]?.trim();
-  return firstClause ? truncate(firstClause, 24) : '申论批阅记录';
-}
-
-/**
- * Extract a single-line excerpt for the feed row. Prefers the 综合评价 section's
- * first sentence; falls back to the first non-heading paragraph.
- */
-function extractFeedExcerpt(content: string | null | undefined): string {
-  if (!content) return '';
-  const stripped = content.replace(/^#\s*写作反馈结果\s*\n?/i, '');
-  const sectionMatch = stripped.match(/##\s*综合评价\s*\n([\s\S]*?)(?=\n##\s|$)/i);
-  const body = sectionMatch?.[1]?.trim();
-  const source = body ?? stripped;
-  // Collapse newlines, take first sentence-ish chunk.
-  const flat = source.replace(/\s+/g, ' ').trim();
-  return flat ? truncate(flat, 60) : '';
-}
-
-function truncate(value: string, max: number): string {
-  if (value.length <= max) return value;
-  // Keep whole characters; safe for CJK since JS strings are UTF-16 and we slice
-  // by code unit — for BMP text (which all our content is) this is correct.
-  return value.slice(0, max) + '…';
-}
+// extractFeedTitle / extractFeedExcerpt live in utils/feedbackDisplay.ts and are
+// shared with the history list so the two surfaces stay consistent.
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { settings } = useSettings();
   const [state, setState] = useState<DashboardState>({
     phase: 'loading',
     items: [],
@@ -174,6 +130,13 @@ export default function DashboardPage() {
 
   const hasHistory = state.phase === 'ready' && state.items.length > 0;
   const greetingName = user?.username ? `，${user.username}` : '';
+
+  // AI readiness from SettingsContext (Phase 3 wiring completion). Honest at
+  // every state: green dot + model name when a key is configured, amber when
+  // not. While settings load (and we have history), we still show the bar but
+  // with a neutral "加载中" state rather than a false "未配置".
+  const aiReady = !!(settings && settings.has_api_key && settings.model_name);
+  const aiLoading = !settings;
 
   return (
     <div className="space-y-6 md:space-y-7">
@@ -224,6 +187,31 @@ export default function DashboardPage() {
           className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12.5px] text-mute pb-5 border-b border-line"
           aria-label="学习统计"
         >
+          {/* AI readiness (Phase 3 wiring). Honest dot + label from SettingsContext. */}
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${aiLoading ? 'bg-faint' : aiReady ? 'bg-ok' : 'bg-warn'}`}
+              aria-hidden="true"
+            />
+            {aiLoading ? (
+              'AI 状态加载中'
+            ) : aiReady ? (
+              <>
+                AI 已就绪
+                {settings?.model_name && (
+                  <span className="font-mono text-faint">· {settings.model_name}</span>
+                )}
+              </>
+            ) : (
+              <Link
+                to="/app/settings"
+                className="text-warn hover:text-oxblood transition-ui underline-offset-2 hover:underline"
+              >
+                AI 未配置，去配置
+              </Link>
+            )}
+          </span>
+          <span className="text-faint" aria-hidden="true">·</span>
           <span>
             本周 <b className="text-ink font-semibold">{stats.thisWeek}</b> 篇
           </span>

@@ -2,14 +2,48 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { writingService } from '../../services/writingService';
 import { Button } from '../../components/ui/Button';
+import { Pin } from '../../components/ui/Pin';
 import { Toast, type ToastType } from '../../components/ui/Toast';
-import { MarkdownRenderer } from '../../components/ui/MarkdownRenderer';
-import { formatRelativeTime } from '../../utils/formatRelativeTime';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { GradingReport } from '../../components/grading/GradingReport';
+import {
+  formatRelativeTimeShort,
+  isWithinDay,
+} from '../../utils/formatRelativeTime';
+import {
+  extractFeedTitle,
+  extractFeedExcerpt,
+} from '../../utils/feedbackDisplay';
+import { AppError, ErrorType } from '../../types/domain';
 import type {
   HistorySummary,
   HistoryDetail,
   HistoryClearResponse,
 } from '../../types/api';
+
+/**
+ * /app/history — HistoryView. design.md §10.9.
+ *
+ * Desktop: list / detail split (left ~2fr list, right ~3fr detail).
+ * Mobile: stacked master-detail — selecting a row swaps the list out for the
+ * detail panel; a back button returns to the list.
+ *
+ * Backend contract (HistoryService.java / types/api.ts):
+ *  - list item `content` is the grading FEEDBACK markdown, NOT the raw essay.
+ *  - `score` is structurally always null — never rendered.
+ *  - detail `request.content` = raw essay; `response.content` = feedback.
+ *  - Backend only stores SUCCESSFUL gradings, so there is NO success/fail
+ *    filter (design.md §10.9).
+ *
+ * Robustness:
+ *  - Stale-fetch guard: `detailRequestIdRef` bumps on every selection so a
+ *    slow prior fetch can't overwrite a newer detail.
+ *  - Debounced search (300ms) over feedback content.
+ *  - Batch delete uses Promise.allSettled so one rejection doesn't discard the
+ *    rest; we reconcile the list against the server afterwards.
+ */
 
 interface ToastState {
   show: boolean;
@@ -31,117 +65,107 @@ const TYPE_LABELS: Record<string, string> = {
   progressive: '渐进批改',
 };
 
-// Strip common markdown symbols to produce a readable one-line excerpt.
-function makeExcerpt(markdown: string, max = 50): string {
-  if (!markdown) return '';
-  const stripped = markdown
-    .replace(/^#{1,6}\s+/gm, '') // headings
-    .replace(/\*\*(.+?)\*\*/g, '$1') // bold
-    .replace(/\*(.+?)\*/g, '$1') // italic
-    .replace(/__(.+?)__/g, '$1') // bold underscore
-    .replace(/_(.+?)_/g, '$1') // italic underscore
-    .replace(/`([^`]+)`/g, '$1') // inline code
-    .replace(/^>\s?/gm, '') // blockquote markers
-    .replace(/^\s*[-+*]\s+/gm, '') // list bullets
-    .replace(/^\s*\d+\.\s+/gm, '') // numbered lists
-    .replace(/\[(.+?)\]\(.+?\)/g, '$1') // links -> text
-    .replace(/\n+/g, ' ')
-    .trim();
-  if (stripped.length <= max) return stripped;
-  return stripped.slice(0, max) + '…';
+/** Map a thrown error to a friendly Chinese message, honoring auth/network. */
+function friendlyMessage(error: unknown, fallback: string): string {
+  if (error instanceof AppError) {
+    if (error.type === ErrorType.AUTH) return '登录已过期，请重新登录';
+    return error.message || fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
 }
 
 export default function HistoryPage() {
   const navigate = useNavigate();
 
-  // List state
+  // ----- List state -----
   const [items, setItems] = useState<HistorySummary[]>([]);
-  const [isLoadingList, setIsLoadingList] = useState(true);
+  const [listPhase, setListPhase] = useState<'loading' | 'ready' | 'error'>(
+    'loading'
+  );
   const [listError, setListError] = useState<string | null>(null);
+  // Bumped by the retry button so the mount effect re-runs the fetch.
+  const [reloadTick, setReloadTick] = useState(0);
 
-  // Detail state
+  // ----- Detail state -----
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<HistoryDetail | null>(null);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [detailPhase, setDetailPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>(
+    'idle'
+  );
   const [detailError, setDetailError] = useState<string | null>(null);
 
-  // Controls
+  // ----- Controls -----
   const [searchInput, setSearchInput] = useState(''); // raw input (immediate)
-  const [searchTerm, setSearchTerm] = useState(''); // debounced term used for filtering
+  const [searchTerm, setSearchTerm] = useState(''); // debounced term
   const [timeRange, setTimeRange] = useState<TimeRangeFilter>('all');
 
-  // Clear-all confirmation flow
-  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
-
-  // Multi-select + batch/single delete
+  // ----- Multi-select + delete -----
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isBatchDeleteConfirmOpen, setIsBatchDeleteConfirmOpen] = useState(false);
-  const [isSingleDeleteConfirmOpen, setIsSingleDeleteConfirmOpen] = useState(false);
+  const [confirm, setConfirm] = useState<
+    | { kind: 'clear' }
+    | { kind: 'batch' }
+    | { kind: 'single'; id: string }
+    | null
+  >(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Toast
-  const [toast, setToast] = useState<ToastState>({ show: false, message: '', type: 'info' });
-
+  // ----- Toast -----
+  const [toast, setToast] = useState<ToastState>({
+    show: false,
+    message: '',
+    type: 'info',
+  });
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
     setToast({ show: true, message, type });
   }, []);
 
   // ----- Data loading -----
-  // loadList fetches the history list. The caller is responsible for the
-  // loading flag: the initial `isLoadingList` state is `true`, and the retry
-  // button sets it before calling. loadList only clears it in `finally`.
   const loadList = useCallback(async () => {
     try {
+      setListPhase('loading');
       const response = await writingService.getHistory();
       setItems(response.items);
       setListError(null);
+      setListPhase('ready');
     } catch (error) {
-      setListError(error instanceof Error ? error.message : '加载历史记录失败');
-    } finally {
-      setIsLoadingList(false);
+      setListError(friendlyMessage(error, '加载历史记录失败'));
+      setListPhase('error');
     }
   }, []);
 
   useEffect(() => {
-    // Initial mount-time data fetch. The setState calls inside loadList run
-    // after the first await, but react-hooks/set-state-in-effect flags any
-    // setState reachable from an effect. Mount-time fetching is a sanctioned
-    // pattern (https://react.dev/learn/you-might-not-need-an-effect), so we
-    // disable the rule for this specific call.
+    // Initial + retry fetch. setState calls run after the first await.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadList();
-  }, [loadList]);
+  }, [loadList, reloadTick]);
 
   // ----- Debounced search (300ms) -----
   useEffect(() => {
-    const handle = setTimeout(() => {
-      setSearchTerm(searchInput.trim());
-    }, 300);
+    const handle = setTimeout(() => setSearchTerm(searchInput.trim()), 300);
     return () => clearTimeout(handle);
   }, [searchInput]);
 
   // ----- Derived filtered list -----
   const filteredItems = useMemo(() => {
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const sevenDaysAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
-    // "本周" interpreted as rolling 7-day window to match the weekly practice semantics
-    const weekStart = new Date(sevenDaysAgo);
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    ).getTime();
+    const weekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
     return items.filter((item) => {
-      // Time range filter
       if (timeRange !== 'all') {
         const ts = new Date(item.timestamp).getTime();
-        if (timeRange === 'today' && ts < startOfToday.getTime()) return false;
-        if (timeRange === 'week' && ts < weekStart.getTime()) return false;
-        if (timeRange === 'month' && ts < monthStart.getTime()) return false;
+        if (timeRange === 'today' && ts < startOfToday) return false;
+        if (timeRange === 'week' && ts < weekAgo) return false;
+        if (timeRange === 'month' && ts < monthStart) return false;
       }
-      // Content search (client-side, substring on feedback content)
       if (searchTerm) {
-        const haystack = item.content || '';
-        if (!haystack.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+        const haystack = (item.content || '').toLowerCase();
+        if (!haystack.includes(searchTerm.toLowerCase())) return false;
       }
       return true;
     });
@@ -151,33 +175,27 @@ export default function HistoryPage() {
   const detailRequestIdRef = useRef(0);
 
   const selectItem = useCallback((id: string) => {
-    // Always (re)fetch on selection. Re-selecting the same id (e.g. via the
-    // detail-error retry button) re-fetches by design.
     setSelectedId(id);
     setDetailError(null);
-
-    const requestId = ++detailRequestIdRef.current;
-    setIsLoadingDetail(true);
+    setDetailPhase('loading');
     setDetail(null);
 
+    const requestId = ++detailRequestIdRef.current;
     writingService
       .getHistoryDetail(id)
       .then((data) => {
-        // Stale guard: a newer selection has been made, ignore this result
-        if (requestId !== detailRequestIdRef.current) return;
+        if (requestId !== detailRequestIdRef.current) return; // stale
         setDetail(data);
+        setDetailPhase('ready');
       })
       .catch((error) => {
-        if (requestId !== detailRequestIdRef.current) return;
-        setDetailError(error instanceof Error ? error.message : '加载详情失败');
-      })
-      .finally(() => {
-        if (requestId !== detailRequestIdRef.current) return;
-        setIsLoadingDetail(false);
+        if (requestId !== detailRequestIdRef.current) return; // stale
+        setDetailError(friendlyMessage(error, '加载详情失败'));
+        setDetailPhase('error');
       });
   }, []);
 
-  // ----- Copy actions -----
+  // ----- Copy -----
   const copyToClipboard = useCallback(
     async (text: string, successMessage: string) => {
       try {
@@ -190,35 +208,12 @@ export default function HistoryPage() {
     [showToast]
   );
 
-  // ----- Clear all history -----
-  const handleClearAll = useCallback(async () => {
-    try {
-      setIsClearing(true);
-      const result = await writingService.clearHistory();
-      // Reset local state
-      setItems([]);
-      setSelectedId(null);
-      setDetail(null);
-      setDetailError(null);
-      setSelectedIds(new Set());
-      setIsClearConfirmOpen(false);
-      showToast(`已清空 ${result.deleted} 条记录`, 'success');
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : '清空历史记录失败', 'error');
-    } finally {
-      setIsClearing(false);
-    }
-  }, [showToast]);
-
   // ----- Multi-select helpers -----
   const toggleRowSelection = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }, []);
@@ -226,13 +221,12 @@ export default function HistoryPage() {
   const allFilteredSelected =
     filteredItems.length > 0 &&
     filteredItems.every((item) => selectedIds.has(item.id));
-  const someFilteredSelected =
-    filteredItems.some((item) => selectedIds.has(item.id));
+  const someFilteredSelected = filteredItems.some((item) =>
+    selectedIds.has(item.id)
+  );
 
   const toggleSelectAll = useCallback(() => {
     setSelectedIds((prev) => {
-      // If everything (currently filtered) is selected, deselect only those;
-      // otherwise add all filtered ids to the existing selection.
       if (
         filteredItems.length > 0 &&
         filteredItems.every((item) => prev.has(item.id))
@@ -249,18 +243,36 @@ export default function HistoryPage() {
 
   const clearSelection = useCallback(() => {
     setSelectedIds(new Set());
-    setIsBatchDeleteConfirmOpen(false);
   }, []);
 
-  // ----- Batch delete (selected ids) -----
-  // Uses Promise.allSettled instead of Promise.all so that a single rejected
-  // delete (e.g. transient 5xx or network blip) does not discard the results
-  // of the already-succeeded deletes. We then reconcile list + detail against
-  // the server and report an accurate per-batch outcome.
+  // ----- Confirm handlers -----
+  // Clear all history.
+  const handleClearAll = useCallback(async () => {
+    if (isDeleting) return; // guard against confirm double-click while in flight
+    try {
+      setIsDeleting(true);
+      const result = await writingService.clearHistory();
+      setItems([]);
+      setSelectedIds(new Set());
+      setSelectedId(null);
+      setDetail(null);
+      setDetailPhase('idle');
+      setDetailError(null);
+      setConfirm(null);
+      showToast(`已清空 ${result.deleted} 条记录`, 'success');
+    } catch (error) {
+      showToast(friendlyMessage(error, '清空历史记录失败'), 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [isDeleting, showToast]);
+
+  // Batch delete selected ids (per-id DELETE; Promise.allSettled for partial).
   const handleBatchDelete = useCallback(async () => {
+    if (isDeleting) return; // guard against confirm double-click while in flight
     const ids = [...selectedIds];
     if (ids.length === 0) {
-      setIsBatchDeleteConfirmOpen(false);
+      setConfirm(null);
       return;
     }
     try {
@@ -272,644 +284,612 @@ export default function HistoryPage() {
         (o): o is PromiseFulfilledResult<HistoryClearResponse> =>
           o.status === 'fulfilled'
       ).length;
-      const failed = outcomes.length - succeeded;
+      const failed = ids.length - succeeded;
 
-      // If the currently-viewed detail was among the (at least partially)
-      // deleted ids, clear the detail panel: the record no longer exists
-      // server-side and the next loadList() will drop it from the list.
       if (selectedId && ids.includes(selectedId)) {
         setSelectedId(null);
         setDetail(null);
+        setDetailPhase('idle');
         setDetailError(null);
       }
       setSelectedIds(new Set());
-      setIsBatchDeleteConfirmOpen(false);
-      // Reload to reconcile the list with the backend.
+      setConfirm(null);
       await loadList();
 
-      if (failed === 0) {
-        showToast(`已删除 ${succeeded} 条记录`, 'success');
-      } else if (succeeded === 0) {
-        showToast(
-          `删除失败，请重试（${failed} 条记录）`,
-          'error'
-        );
-      } else {
+      if (failed === 0) showToast(`已删除 ${succeeded} 条记录`, 'success');
+      else if (succeeded === 0)
+        showToast(`删除失败，请重试（${failed} 条记录）`, 'error');
+      else
         showToast(
           `已删除 ${succeeded} 条记录，${failed} 条失败请重试`,
           'warning'
         );
-      }
     } catch (error) {
-      // Defensive: Promise.allSettled never throws on rejection, but a
-      // synchronous error (e.g. in setSelectedIds) should still reconcile.
-      showToast(error instanceof Error ? error.message : '删除记录失败', 'error');
+      showToast(friendlyMessage(error, '删除记录失败'), 'error');
       setSelectedIds(new Set());
-      setIsBatchDeleteConfirmOpen(false);
+      setConfirm(null);
       await loadList();
     } finally {
       setIsDeleting(false);
     }
-  }, [selectedIds, selectedId, loadList, showToast]);
+  }, [isDeleting, selectedIds, selectedId, loadList, showToast]);
 
-  // ----- Single delete (from detail panel) -----
+  // Single delete (from detail panel).
   const handleSingleDelete = useCallback(async () => {
+    if (isDeleting) return; // guard against confirm double-click while in flight
     const id = selectedId;
     if (!id) {
-      setIsSingleDeleteConfirmOpen(false);
+      setConfirm(null);
       return;
     }
     try {
       setIsDeleting(true);
       await writingService.deleteHistoryItem(id);
-      // Remove from selection set if present.
       setSelectedIds((prev) => {
         if (!prev.has(id)) return prev;
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
-      // Clear the detail panel: the viewed record is gone.
       setSelectedId(null);
       setDetail(null);
+      setDetailPhase('idle');
       setDetailError(null);
-      setIsSingleDeleteConfirmOpen(false);
+      setConfirm(null);
       await loadList();
       showToast('已删除该记录', 'success');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : '删除记录失败', 'error');
-      setIsSingleDeleteConfirmOpen(false);
+      showToast(friendlyMessage(error, '删除记录失败'), 'error');
+      setConfirm(null);
       await loadList();
     } finally {
       setIsDeleting(false);
     }
-  }, [selectedId, loadList, showToast]);
+  }, [isDeleting, selectedId, loadList, showToast]);
 
-  const hasAnyRecords = items.length > 0;
+  const clearAllFilters = () => {
+    setSearchInput('');
+    setSearchTerm('');
+    setTimeRange('all');
+  };
+
+  const hasAnyRecords = listPhase === 'ready' && items.length > 0;
   const hasFilterResults = filteredItems.length > 0;
   const selectedCount = selectedIds.size;
+  const isMobileDetailOpen = !!selectedId;
 
   return (
-    <main id="main-content" className="min-h-screen bg-paper-white">
-      <div className="max-w-content mx-auto px-4 py-8">
-        {/* Sticky header */}
-        <div className="mb-6 sticky top-0 bg-paper-white z-10 pb-4 -mx-4 px-4 border-b border-slate-gray/10">
-          <h1 className="text-3xl font-display text-deep-ink mb-2">历史记录</h1>
-          <p className="text-slate-gray text-sm">查看您的写作批改记录与反馈</p>
-        </div>
+    <div className="space-y-5">
+      {/* Page header */}
+      <div>
+        <h1 className="text-[24px] md:text-[28px] font-semibold tracking-tight text-ink">
+          批改历史
+        </h1>
+        <p className="text-[13px] text-mute mt-1 leading-relaxed">
+          按时间与关键词回看每一次批改，对照原文与结构化报告复盘改进。
+        </p>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          {/* ===== List Panel (left, ~40%) ===== */}
-          <div className="md:col-span-2">
-            {/* Controls bar */}
-            <div className="bg-card-cream rounded-lg p-4 border border-slate-gray/20 mb-4 space-y-3">
-              {/* Search */}
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="搜索批改内容..."
-                  aria-label="搜索历史记录"
-                  className="w-full pl-9 pr-8 py-2 rounded-md border border-slate-gray/30 bg-paper-white text-deep-ink text-sm placeholder:text-slate-gray/50 focus:outline-none focus:ring-2 focus:ring-vermilion focus:border-vermilion"
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 items-start">
+        {/* ===== LIST COLUMN ===== */}
+        <div className={isMobileDetailOpen ? 'hidden lg:block' : 'block'}>
+          {/* Controls */}
+          <div className="rounded-lg border border-line bg-paper p-4 mb-4 space-y-3">
+            {/* Search */}
+            <div className="relative">
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="搜索批改内容…"
+                aria-label="搜索历史记录"
+                className="w-full h-10 pl-9 pr-9 rounded-md border border-line bg-paper text-ink text-[13px] placeholder:text-faint focus:border-ink focus:outline-none transition-ui"
+              />
+              <svg
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-faint"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
-                {/* Search icon */}
-                <svg
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-gray"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
+              </svg>
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput('');
+                    setSearchTerm('');
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-faint hover:text-ink transition-ui rounded"
+                  aria-label="清除搜索"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                {/* Clear search button */}
-                {searchInput && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchInput('');
-                      setSearchTerm('');
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-slate-gray hover:text-deep-ink transition-smooth"
-                    aria-label="清除搜索"
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                    aria-hidden="true"
                   >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                )}
-              </div>
+                    <path
+                      fillRule="evenodd"
+                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
 
-              {/* Time-range segmented control */}
-              <div className="flex items-center gap-1 flex-wrap" role="group" aria-label="时间范围筛选">
-                {(Object.keys(TIME_RANGE_LABELS) as TimeRangeFilter[]).map((key) => (
+            {/* Time-range segmented control */}
+            <div
+              className="flex items-center gap-1 flex-wrap"
+              role="group"
+              aria-label="时间范围筛选"
+            >
+              {(Object.keys(TIME_RANGE_LABELS) as TimeRangeFilter[]).map(
+                (key) => (
                   <button
                     key={key}
                     type="button"
                     onClick={() => setTimeRange(key)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-smooth min-h-[44px] ${
+                    className={`px-3 h-9 text-[12.5px] font-medium rounded-md transition-ui ${
                       timeRange === key
-                        ? 'bg-vermilion text-paper-white'
-                        : 'bg-paper-white text-slate-gray hover:text-deep-ink border border-slate-gray/20'
+                        ? 'bg-shell text-white'
+                        : 'bg-paper text-mute hover:text-ink border border-line'
                     }`}
                     aria-pressed={timeRange === key}
                   >
                     {TIME_RANGE_LABELS[key]}
                   </button>
-                ))}
-              </div>
+                )
+              )}
+            </div>
 
-              {/* Select-all (only when there are filtered results) */}
-              {hasFilterResults && (
-                <label className="flex items-center gap-2 text-sm text-slate-gray cursor-pointer select-none p-3 -m-3">
+            {/* Select-all + clear-all row */}
+            {hasFilterResults && (
+              <div className="flex items-center justify-between pt-2 border-t border-line">
+                <label className="flex items-center gap-2 text-[12.5px] text-mute cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={allFilteredSelected}
                     ref={(el) => {
-                      if (el) el.indeterminate = !allFilteredSelected && someFilteredSelected;
+                      if (el)
+                        el.indeterminate =
+                          !allFilteredSelected && someFilteredSelected;
                     }}
                     onChange={toggleSelectAll}
                     aria-label="全选当前筛选结果"
-                    className="w-4 h-4 rounded border-slate-gray/40 text-vermilion focus:ring-vermilion cursor-pointer"
+                    className="w-4 h-4 rounded border-line text-mark focus:ring-mark cursor-pointer accent-mark"
                   />
                   全选
                 </label>
-              )}
-
-              {/* Clear-all action */}
-              {hasAnyRecords && !isClearConfirmOpen && (
-                <div className="pt-2 border-t border-slate-gray/20">
-                  <button
-                    type="button"
-                    onClick={() => setIsClearConfirmOpen(true)}
-                    className="w-full px-3 py-2 text-sm font-medium text-error-crimson hover:bg-error-crimson/5 rounded-md border border-error-crimson/20 transition-smooth min-h-[40px]"
-                  >
-                    清空全部历史
-                  </button>
-                </div>
-              )}
-
-              {/* Double confirmation for clear-all */}
-              {isClearConfirmOpen && (
-                <div className="pt-2 border-t border-slate-gray/20">
-                  <div className="p-3 rounded-md bg-error-crimson/5 border border-error-crimson/30">
-                    <p className="text-sm text-deep-ink mb-3">
-                      确定要清空全部历史记录吗？此操作不可恢复。
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="primary"
-                        className="bg-error-crimson hover:bg-error-crimson/90 focus:ring-error-crimson flex-1"
-                        onClick={handleClearAll}
-                        isLoading={isClearing}
-                      >
-                        确认清空
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="flex-1"
-                        onClick={() => setIsClearConfirmOpen(false)}
-                        disabled={isClearing}
-                      >
-                        取消
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Selection toolbar (only when items are selected) */}
-            {selectedCount > 0 && (
-              <div className="bg-card-cream rounded-lg p-3 border border-vermilion/30 mb-4">
-                {!isBatchDeleteConfirmOpen ? (
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-sm text-deep-ink font-medium">
-                      已选 {selectedCount} 项
-                    </span>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={clearSelection}
-                        className="text-sm text-slate-gray hover:text-deep-ink transition-smooth min-h-[36px] px-2"
-                      >
-                        取消选择
-                      </button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="text-error-crimson border-error-crimson/30 hover:bg-error-crimson/5 focus:ring-error-crimson min-h-[40px]"
-                        onClick={() => setIsBatchDeleteConfirmOpen(true)}
-                      >
-                        删除选中
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-md bg-error-crimson/5 border border-error-crimson/30">
-                    <p className="text-sm text-deep-ink mb-3">
-                      确定要删除选中的 {selectedCount} 条记录吗？此操作不可恢复。
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="primary"
-                        className="bg-error-crimson hover:bg-error-crimson/90 focus:ring-error-crimson flex-1"
-                        onClick={handleBatchDelete}
-                        isLoading={isDeleting}
-                      >
-                        确认删除
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="flex-1"
-                        onClick={() => setIsBatchDeleteConfirmOpen(false)}
-                        disabled={isDeleting}
-                      >
-                        取消
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setConfirm({ kind: 'clear' })}
+                  className="text-[12.5px] font-medium text-mark hover:brightness-95 transition-ui px-2 h-9 rounded"
+                >
+                  清空全部
+                </button>
               </div>
             )}
+          </div>
 
-            {/* List body */}
-            <div className="space-y-2">
-              {/* Loading skeleton */}
-              {isLoadingList && (
-                <div aria-busy="true" aria-label="加载历史记录中">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className="p-4 rounded-lg border border-slate-gray/20 bg-card-cream animate-pulse"
-                      aria-hidden="true"
-                    >
-                      <div className="h-3 w-20 bg-slate-gray/20 rounded mb-2" />
-                      <div className="h-4 w-full bg-slate-gray/20 rounded mb-1" />
-                      <div className="h-3 w-12 bg-slate-gray/20 rounded" />
+          {/* Selection toolbar */}
+          {selectedCount > 0 && (
+            <div className="rounded-lg border border-mark/30 bg-mark-soft/40 p-3 mb-4 flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-[13px] text-ink font-medium">
+                已选 {selectedCount} 项
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSelection}
+                >
+                  取消选择
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setConfirm({ kind: 'batch' })}
+                >
+                  删除选中
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* List body */}
+          {listPhase === 'loading' && (
+            <div aria-busy="true" aria-label="加载历史记录中">
+              <div className="rounded-lg border border-line bg-paper overflow-hidden divide-y divide-line">
+                {[0, 1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 px-4 py-3.5"
+                  >
+                    <Skeleton className="h-5 w-8 shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-full" />
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {/* List error */}
-              {!isLoadingList && listError && (
-                <div className="p-6 rounded-lg border border-slate-gray/20 bg-card-cream text-center">
-                  <p className="text-sm text-error-crimson mb-3">{listError}</p>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setIsLoadingList(true);
-                      loadList();
-                    }}
-                  >
-                    重试
-                  </Button>
-                </div>
-              )}
-
-              {/* Empty state: no records at all */}
-              {!isLoadingList && !listError && !hasAnyRecords && (
-                <div className="p-8 rounded-lg border border-slate-gray/20 bg-card-cream text-center">
-                  <svg
-                    className="w-12 h-12 text-slate-gray/40 mx-auto mb-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                  <p className="text-deep-ink font-medium mb-1">还没有批改记录</p>
-                  <p className="text-sm text-slate-gray mb-4">完成第一次写作批改后，记录将显示在这里</p>
-                  <Button type="button" onClick={() => navigate('/app/writing')}>
-                    去写作
-                  </Button>
-                </div>
-              )}
-
-              {/* Empty-after-filter state */}
-              {!isLoadingList && !listError && hasAnyRecords && !hasFilterResults && (
-                <div className="p-8 rounded-lg border border-slate-gray/20 bg-card-cream text-center">
-                  <p className="text-deep-ink font-medium mb-1">没有匹配的记录</p>
-                  <p className="text-sm text-slate-gray mb-3">尝试调整筛选条件或搜索关键词</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchInput('');
-                      setSearchTerm('');
-                      setTimeRange('all');
-                    }}
-                    className="text-sm text-vermilion hover:text-vermilion/80 transition-smooth"
-                  >
-                    清除所有筛选
-                  </button>
-                </div>
-              )}
-
-              {/* List items */}
-              {!isLoadingList && !listError && hasFilterResults && (
-                <>
-                  {filteredItems.map((item) => {
-                    const isActive = item.id === selectedId;
-                    const isSelected = selectedIds.has(item.id);
-                    const excerpt = makeExcerpt(item.content);
-                    return (
-                      <div
-                        key={item.id}
-                        className={`relative rounded-lg border transition-smooth min-h-[80px] ${
-                          isActive
-                            ? 'border-vermilion bg-vermilion/5'
-                            : 'border-slate-gray/20 bg-card-cream hover:border-vermilion/40 hover:bg-vermilion/5'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => selectItem(item.id)}
-                          aria-current={isActive ? 'true' : undefined}
-                          className="w-full text-left p-4 pl-12"
-                        >
-                          <div className="flex items-center justify-between mb-1.5 gap-2">
-                            <span className="text-xs text-slate-gray">
-                              {formatRelativeTime(item.timestamp)}
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              {item.taskType && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-deep-ink/5 text-deep-ink">
-                                  {item.taskType}
-                                </span>
-                              )}
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-gray/10 text-slate-gray">
-                                {TYPE_LABELS[item.type] || item.type}
-                              </span>
-                            </div>
-                          </div>
-                          <p className="text-sm text-deep-ink line-clamp-2 leading-snug">
-                            {excerpt || '(无批改内容)'}
-                          </p>
-                        </button>
-                        <label htmlFor={`checkbox-${item.id}`} className="sr-only">
-                          选择记录 {excerpt}
-                        </label>
-                        <input
-                          id={`checkbox-${item.id}`}
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleRowSelection(item.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute left-3 top-4 w-4 h-4 rounded border-slate-gray/40 text-vermilion focus:ring-vermilion cursor-pointer"
-                        />
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* ===== Detail Panel (right, ~60%) ===== */}
-          <div className="md:col-span-3">
-            <div className="bg-card-cream rounded-lg border border-slate-gray/20 min-h-[400px] sticky top-32">
-              {/* No selection placeholder */}
-              {!selectedId && !isLoadingDetail && (
-                <div className="p-12 text-center">
-                  <svg
-                    className="w-12 h-12 text-slate-gray/40 mx-auto mb-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="text-slate-gray">从左侧选择一条记录查看详情</p>
-                </div>
-              )}
-
-              {/* Detail loading */}
-              {selectedId && isLoadingDetail && (
-                <div className="p-6 animate-pulse" aria-hidden="true" aria-busy="true">
-                  <div className="h-5 w-40 bg-slate-gray/20 rounded mb-4" />
-                  <div className="h-3 w-32 bg-slate-gray/20 rounded mb-6" />
-                  <div className="h-4 w-24 bg-slate-gray/20 rounded mb-2" />
-                  <div className="h-3 w-full bg-slate-gray/20 rounded mb-1" />
-                  <div className="h-3 w-full bg-slate-gray/20 rounded mb-1" />
-                  <div className="h-3 w-2/3 bg-slate-gray/20 rounded mb-6" />
-                  <div className="h-4 w-24 bg-slate-gray/20 rounded mb-2" />
-                  <div className="h-3 w-full bg-slate-gray/20 rounded mb-1" />
-                  <div className="h-3 w-full bg-slate-gray/20 rounded mb-1" />
-                  <div className="h-3 w-1/2 bg-slate-gray/20 rounded" />
-                </div>
-              )}
-
-              {/* Detail error */}
-              {selectedId && !isLoadingDetail && detailError && (
-                <div className="p-6">
-                  <div className="p-4 rounded-md bg-error-crimson/10 border border-error-crimson/30 mb-4">
-                    <p className="text-sm text-error-crimson mb-3">{detailError}</p>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => selectedId && selectItem(selectedId)}
-                    >
-                      重试
-                    </Button>
                   </div>
-                </div>
-              )}
-
-              {/* Detail content */}
-              {selectedId && !isLoadingDetail && detail && (
-                <HistoryDetailContent
-                  detail={detail}
-                  onCopy={copyToClipboard}
-                  onDelete={handleSingleDelete}
-                  isDeleteConfirmOpen={isSingleDeleteConfirmOpen}
-                  onOpenDeleteConfirm={() => setIsSingleDeleteConfirmOpen(true)}
-                  onCancelDeleteConfirm={() => setIsSingleDeleteConfirmOpen(false)}
-                  isDeleting={isDeleting}
-                />
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {listPhase === 'error' && (
+            <div
+              role="alert"
+              className="rounded-lg border border-mark/30 bg-mark-soft/40 p-4"
+            >
+              <p className="text-[13px] text-mark leading-relaxed">
+                {listError}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => setReloadTick((t) => t + 1)}
+              >
+                重试
+              </Button>
+            </div>
+          )}
+
+          {listPhase === 'ready' && !hasAnyRecords && (
+            <EmptyState
+              title="还没有批改记录"
+              description="写下第一篇申论作答，拿到任务类型判断、亮点与改进建议——记录会自动留在这里，方便复盘。"
+              action={
+                <Button onClick={() => navigate('/app/writing')}>
+                  写下第一篇申论
+                </Button>
+              }
+            />
+          )}
+
+          {listPhase === 'ready' &&
+            hasAnyRecords &&
+            !hasFilterResults && (
+              <EmptyState
+                title="没有匹配的记录"
+                description="换个关键词或放宽时间范围试试。"
+                action={
+                  <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                    清除所有筛选
+                  </Button>
+                }
+              />
+            )}
+
+          {listPhase === 'ready' && hasFilterResults && (
+            <ul className="rounded-lg border border-line bg-paper overflow-hidden divide-y divide-line">
+              {filteredItems.map((item) => {
+                const isActive = item.id === selectedId;
+                const isSelected = selectedIds.has(item.id);
+                const fresh = isWithinDay(item.timestamp);
+                const title = extractFeedTitle(item.content);
+                const excerpt = extractFeedExcerpt(item.content);
+                return (
+                  <li
+                    key={item.id}
+                    className={`relative transition-ui ${
+                      isActive
+                        ? 'bg-mark-soft/40'
+                        : 'hover:bg-panel/60'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => selectItem(item.id)}
+                      aria-current={isActive ? 'true' : undefined}
+                      className="w-full text-left flex items-start gap-3 px-4 py-3.5 pl-11"
+                    >
+                      <Pin
+                        tone={fresh ? 'mark' : 'ok'}
+                        className="mt-0.5 shrink-0"
+                      >
+                        {formatRelativeTimeShort(item.timestamp)}
+                      </Pin>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[13.5px] font-medium text-ink truncate">
+                            {title}
+                          </span>
+                          {item.taskType && (
+                            <span className="text-[10.5px] font-mono text-faint shrink-0">
+                              {item.taskType}
+                            </span>
+                          )}
+                        </div>
+                        {excerpt && (
+                          <p className="text-[12.5px] text-mute truncate">
+                            {excerpt}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                    <label
+                      htmlFor={`row-${item.id}`}
+                      className="sr-only"
+                    >
+                      选择记录 {title}
+                    </label>
+                    <input
+                      id={`row-${item.id}`}
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleRowSelection(item.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute left-3.5 top-5 w-4 h-4 rounded border-line text-mark focus:ring-mark cursor-pointer accent-mark"
+                      aria-label={`选择记录 ${title}`}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {/* List footer note: cumulative is capped at 50 by the backend. */}
+          {hasAnyRecords && (
+            <p className="mt-3 text-[11px] font-mono text-faint">
+              仅显示最近 50 条记录{searchTerm || timeRange !== 'all' ? '（筛选后）' : ''}。
+            </p>
+          )}
         </div>
 
-        {/* Toast */}
-        {toast.show && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast({ ...toast, show: false })}
-          />
-        )}
+        {/* ===== DETAIL COLUMN ===== */}
+        <div className={isMobileDetailOpen ? 'block' : 'hidden lg:block'}>
+          {/* Mobile back button */}
+          {isMobileDetailOpen && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedId(null);
+                setDetail(null);
+                setDetailPhase('idle');
+                setDetailError(null);
+              }}
+              className="lg:hidden mb-3 inline-flex items-center gap-1.5 text-[13px] text-mute hover:text-ink transition-ui"
+            >
+              <svg
+                className="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path
+                  d="M19 12H5M11 18l-6-6 6-6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              返回列表
+            </button>
+          )}
+
+          {!selectedId && detailPhase !== 'loading' && (
+            <EmptyState
+              title="选择一条记录查看详情"
+              description="点击左侧任意批改，查看原文与完整的结构化批阅报告。"
+              className="min-h-[320px]"
+            />
+          )}
+
+          {selectedId && detailPhase === 'loading' && (
+            <div
+              aria-busy="true"
+              aria-label="加载批改详情中"
+              className="rounded-lg border border-line bg-paper p-5 space-y-3"
+            >
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3 w-24" />
+              <div className="pt-3 border-t border-line space-y-2">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+              <div className="pt-3 border-t border-line space-y-2">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          )}
+
+          {selectedId && detailPhase === 'error' && (
+            <div
+              role="alert"
+              className="rounded-lg border border-mark/30 bg-mark-soft/40 p-4"
+            >
+              <p className="text-[13px] text-mark leading-relaxed">
+                {detailError}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => selectedId && selectItem(selectedId)}
+              >
+                重试
+              </Button>
+            </div>
+          )}
+
+          {selectedId && detailPhase === 'ready' && detail && (
+            <HistoryDetailContent
+              detail={detail}
+              onCopy={copyToClipboard}
+              onAskDelete={() =>
+                setConfirm({ kind: 'single', id: detail.id })
+              }
+            />
+          )}
+        </div>
       </div>
-    </main>
+
+      {/* Confirm dialogs (clear / batch / single) */}
+      <ConfirmDialog
+        isOpen={confirm?.kind === 'clear'}
+        title="清空全部历史记录"
+        message="将删除当前账号下的全部批改记录，此操作不可恢复。"
+        confirmText="确认清空"
+        variant="danger"
+        onConfirm={handleClearAll}
+        onCancel={() => !isDeleting && setConfirm(null)}
+      />
+      <ConfirmDialog
+        isOpen={confirm?.kind === 'batch'}
+        title={`删除选中的 ${selectedCount} 条记录`}
+        message="选中的批改记录将被永久删除，此操作不可恢复。"
+        confirmText="确认删除"
+        variant="danger"
+        onConfirm={handleBatchDelete}
+        onCancel={() => !isDeleting && setConfirm(null)}
+      />
+      <ConfirmDialog
+        isOpen={confirm?.kind === 'single'}
+        title="删除这条记录"
+        message="这条批改记录将被永久删除，此操作不可恢复。"
+        confirmText="确认删除"
+        variant="danger"
+        onConfirm={handleSingleDelete}
+        onCancel={() => !isDeleting && setConfirm(null)}
+      />
+
+      {/* Toast */}
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast((t) => ({ ...t, show: false }))}
+        />
+      )}
+    </div>
   );
 }
 
 /**
- * Detail panel body. Extracted as a sub-component to keep the main page
- * component readable and to encapsulate the collapsible-original-content
- * state locally.
+ * Detail panel body. Shows the original essay (collapsible) + the structured
+ * GradingReport for the feedback, plus copy-original and delete actions.
+ * design.md §10.9: detail = 原文(request.content) + 报告(GradingReport).
  */
 function HistoryDetailContent({
   detail,
   onCopy,
-  onDelete,
-  isDeleteConfirmOpen,
-  onOpenDeleteConfirm,
-  onCancelDeleteConfirm,
-  isDeleting,
+  onAskDelete,
 }: {
   detail: HistoryDetail;
   onCopy: (text: string, successMessage: string) => void;
-  onDelete: () => void;
-  isDeleteConfirmOpen: boolean;
-  onOpenDeleteConfirm: () => void;
-  onCancelDeleteConfirm: () => void;
-  isDeleting: boolean;
+  onAskDelete: () => void;
 }) {
   const [isOriginalExpanded, setIsOriginalExpanded] = useState(false);
+  const hasOriginal = !!detail.request.content?.trim();
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header: full timestamp + type badge + delete action */}
+    <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="text-lg font-display font-semibold text-deep-ink mb-1">
+        <div className="min-w-0">
+          <h2 className="text-[17px] font-semibold tracking-tight text-ink">
             批改详情
           </h2>
-          <p className="text-sm text-slate-gray">
+          <p className="text-[12.5px] text-mute mt-0.5">
             {new Date(detail.timestamp).toLocaleString('zh-CN')}
+            {detail.request.task_type && (
+              <span className="ml-2 font-mono text-faint">
+                {detail.request.task_type}
+              </span>
+            )}
+            <span className="ml-2 text-faint">·</span>
+            <span className="ml-2 text-faint">
+              {TYPE_LABELS[detail.type] || detail.type}
+            </span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-slate-gray/10 text-slate-gray">
-            {TYPE_LABELS[detail.type] || detail.type}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-error-crimson hover:bg-error-crimson/10 focus:ring-error-crimson min-h-[40px]"
-            onClick={onOpenDeleteConfirm}
-            disabled={isDeleteConfirmOpen || isDeleting}
-            aria-label="删除此记录"
-          >
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="ghost" size="sm" onClick={onAskDelete}>
             删除此记录
           </Button>
         </div>
       </div>
 
-      {/* Single-delete double confirmation */}
-      {isDeleteConfirmOpen && (
-        <div className="p-3 rounded-md bg-error-crimson/5 border border-error-crimson/30">
-          <p className="text-sm text-deep-ink mb-3">
-            确定要删除这条记录吗？此操作不可恢复。
-          </p>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="primary"
-              className="bg-error-crimson hover:bg-error-crimson/90 focus:ring-error-crimson flex-1"
-              onClick={onDelete}
-              isLoading={isDeleting}
-            >
-              确认删除
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="flex-1"
-              onClick={onCancelDeleteConfirm}
-              disabled={isDeleting}
-            >
-              取消
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Original writing (collapsible) */}
+      {/* Original essay (collapsible). design.md §10.9: 原文 = request.content. */}
       <section>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-deep-ink">原文</h3>
-          <button
-            type="button"
-            onClick={() => onCopy(detail.request.content, '原文已复制到剪贴板')}
-            className="inline-flex items-center gap-1 text-xs text-vermilion hover:text-vermilion/80 transition-smooth min-h-[32px] px-2"
-            aria-label="复制原文"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            复制原文
-          </button>
-        </div>
-        <div className="bg-paper-white rounded-md border border-slate-gray/20">
-          <div
-            className={`p-4 text-sm text-deep-ink leading-relaxed whitespace-pre-wrap overflow-hidden ${
-              isOriginalExpanded ? 'max-h-[600px] overflow-y-auto' : 'max-h-[4.5rem]'
-            }`}
-          >
-            {detail.request.content || '(无原文内容)'}
-          </div>
-          {detail.request.content && (
+          <h3 className="text-[11px] font-semibold tracking-[0.02em] text-oxblood">
+            原文
+          </h3>
+          {hasOriginal && (
             <button
               type="button"
-              onClick={() => setIsOriginalExpanded((v) => !v)}
-              className="w-full py-2 text-xs text-vermilion hover:bg-vermilion/5 transition-smooth border-t border-slate-gray/20"
-              aria-expanded={isOriginalExpanded}
+              onClick={() =>
+                onCopy(detail.request.content, '原文已复制到剪贴板')
+              }
+              className="inline-flex items-center gap-1 text-[12px] text-mute hover:text-ink transition-ui px-1.5 py-1 rounded"
+              aria-label="复制原文"
             >
-              {isOriginalExpanded ? '收起' : '展开'}
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
+              </svg>
+              复制原文
             </button>
           )}
         </div>
-      </section>
-
-      {/* Grading feedback (markdown) */}
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-deep-ink">批改反馈</h3>
-          <button
-            type="button"
-            onClick={() => onCopy(detail.response.content, '批改反馈已复制到剪贴板')}
-            className="inline-flex items-center gap-1 text-xs text-vermilion hover:text-vermilion/80 transition-smooth min-h-[32px] px-2"
-            aria-label="复制批改反馈"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            复制批改
-          </button>
-        </div>
-        <div className="bg-paper-white rounded-md border border-slate-gray/20 p-4 max-h-[600px] overflow-y-auto">
-          {detail.response.content ? (
-            <MarkdownRenderer>{detail.response.content}</MarkdownRenderer>
+        <div className="rounded-lg border border-line bg-paper overflow-hidden">
+          {hasOriginal ? (
+            <>
+              <div
+                className={`px-4 py-3 text-[13.5px] text-ink leading-[1.85] whitespace-pre-wrap overflow-hidden ${
+                  isOriginalExpanded
+                    ? 'max-h-[600px] overflow-y-auto'
+                    : 'max-h-[5.5rem]'
+                }`}
+              >
+                {detail.request.content}
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOriginalExpanded((v) => !v)}
+                className="w-full py-2 text-[12px] text-mute hover:text-ink hover:bg-panel transition-ui border-t border-line"
+                aria-expanded={isOriginalExpanded}
+              >
+                {isOriginalExpanded ? '收起原文' : '展开原文'}
+              </button>
+            </>
           ) : (
-            <p className="text-sm text-slate-gray italic">(无批改内容)</p>
+            <p className="px-4 py-3 text-[13px] text-faint italic">
+              （无原文内容）
+            </p>
           )}
         </div>
       </section>
 
-      {/* Extra metadata (if present) */}
-      {detail.extra && Object.keys(detail.extra).length > 0 && (
-        <section>
-          <h3 className="text-sm font-semibold text-deep-ink mb-2">附加信息</h3>
-          <pre className="p-4 rounded-md bg-deep-ink/5 border border-slate-gray/20 text-xs text-slate-gray font-mono overflow-x-auto">
-            {JSON.stringify(detail.extra, null, 2)}
-          </pre>
-        </section>
-      )}
+      {/* Feedback report (design.md §10.9: 报告 = GradingReport). */}
+      <GradingReport
+        markdown={detail.response.content || ''}
+        meta={{ time: detail.timestamp }}
+      />
     </div>
   );
 }

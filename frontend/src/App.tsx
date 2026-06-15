@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { SettingsProvider } from './contexts/SettingsContext';
 import RequireAuth from './components/RequireAuth';
 import AppLayout from './components/AppLayout';
 import ApiClientSync from './components/ApiClientSync';
@@ -24,6 +25,14 @@ function App() {
           under <AuthProvider>.
         */}
         <ApiClientSync />
+
+        {/*
+          SettingsProvider caches AI config (5-min TTL) so every /app surface —
+          the CommandBar readiness dot, the dashboard stat bar, and the
+          SettingsConsole — shares one source of truth (design.md §7). Mounted
+          inside <BrowserRouter> (no router dep) and under <AuthProvider>.
+        */}
+        <SettingsProvider>
 
         {/* Skip to main content (a11y) */}
         <a
@@ -67,6 +76,7 @@ function App() {
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </SettingsProvider>
       </BrowserRouter>
     </AuthProvider>
   );
