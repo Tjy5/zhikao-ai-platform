@@ -9,4 +9,5 @@ public record UserRecord(
     String hashedPassword,
     boolean active,
     Instant createdAt,
-    Instant updatedAt) {}
+    Instant updatedAt,
+    String role) {}

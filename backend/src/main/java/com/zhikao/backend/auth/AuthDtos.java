@@ -18,7 +18,8 @@ public final class AuthDtos {
       long id,
       String username,
       String email,
-      @JsonProperty("is_active") boolean active) {}
+      @JsonProperty("is_active") boolean active,
+      String role) {}
 
   public record TokenResponse(
       @JsonProperty("access_token") String accessToken,

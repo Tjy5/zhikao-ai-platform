@@ -26,6 +26,7 @@ app:
   openai-api-base: ${OPENAI_API_BASE:https://api.openai.com/v1}
   openai-model-name: ${OPENAI_MODEL_NAME:gpt-4o-mini}
   writing-llm-json-fallback: ${WRITING_LLM_JSON_FALLBACK:true}
+  admin-usernames: ${APP_ADMIN_USERNAMES:}
 
 logging:
   level:

@@ -424,41 +424,6 @@ class BackendContractTests extends IntegrationTestSupport {
         .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
   }
 
-  private Session registerAndLogin(String prefix) throws Exception {
-    String username = unique(prefix);
-    String password = "StrongPass123!";
-    MvcResult register =
-        mockMvc
-            .perform(
-                post("/api/v1/auth/register")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        objectMapper.writeValueAsString(
-                            Map.of(
-                                "username",
-                                username,
-                                "email",
-                                username + "@example.com",
-                                "password",
-                                password))))
-            .andExpect(status().isCreated())
-            .andReturn();
-    MvcResult login = login(username, password);
-    return new Session(json(register).path("id").asLong(), json(login).path("access_token").asText());
-  }
-
-  private MvcResult login(String username, String password) throws Exception {
-    return mockMvc
-        .perform(
-            post("/api/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        Map.of("username_or_email", username, "password", password))))
-        .andExpect(status().isOk())
-        .andReturn();
-  }
-
   private org.springframework.test.web.servlet.ResultActions saveSettings(
       Session user, String baseUrl, String modelName, String apiKey) throws Exception {
     return mockMvc.perform(
@@ -492,11 +457,5 @@ class BackendContractTests extends IntegrationTestSupport {
     String body = result.getResponse().getContentAsString();
     assertThat(body).startsWith("data: ");
     return objectMapper.readTree(body.substring("data: ".length()).trim());
-  }
-
-  private record Session(long userId, String token) {
-    String authHeader() {
-      return "Bearer " + token;
-    }
   }
 }

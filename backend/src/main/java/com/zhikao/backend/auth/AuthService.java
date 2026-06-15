@@ -59,7 +59,7 @@ public class AuthService {
   }
 
   public UserResponse toResponse(UserRecord user) {
-    return new UserResponse(user.id(), user.username(), user.email(), user.active());
+    return new UserResponse(user.id(), user.username(), user.email(), user.active(), user.role());
   }
 
   private static String normalizeUsername(String value) {
