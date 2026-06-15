@@ -6,7 +6,7 @@ import AppLayout from './components/AppLayout';
 import ApiClientSync from './components/ApiClientSync';
 
 // Pages
-import HomePage from './app/page';
+import LandingPage from './app/page';
 import LoginPage from './app/login/page';
 import RegisterPage from './app/register/page';
 import DashboardPage from './app/dashboard/page';
@@ -44,7 +44,7 @@ function App() {
 
         <Routes>
           {/* Public routes */}
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
