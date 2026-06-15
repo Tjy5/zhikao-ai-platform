@@ -14,15 +14,24 @@ public record AppProperties(
     String openaiApiKey,
     String openaiApiBase,
     String openaiModelName,
-    boolean writingLlmJsonFallback) {
+    boolean writingLlmJsonFallback,
+    String adminUsernames) {
 
   public List<String> corsOriginList() {
-    if (corsOrigins == null || corsOrigins.isBlank()) {
+    return splitCommaList(corsOrigins);
+  }
+
+  public List<String> adminUsernameList() {
+    return splitCommaList(adminUsernames);
+  }
+
+  private static List<String> splitCommaList(String value) {
+    if (value == null || value.isBlank()) {
       return List.of();
     }
-    return Arrays.stream(corsOrigins.split(","))
+    return Arrays.stream(value.split(","))
         .map(String::trim)
-        .filter(value -> !value.isBlank())
+        .filter(part -> !part.isBlank())
         .distinct()
         .toList();
   }
