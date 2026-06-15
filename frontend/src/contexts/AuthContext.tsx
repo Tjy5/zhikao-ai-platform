@@ -141,12 +141,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, []);
 
+  // Derive `isAdmin` in the value (NOT stored in state) so every setState path
+  // stays correct without recomputing — it tracks `state.user.role` directly.
   const value: AuthContextValue = {
     ...state,
     login,
     register,
     logout,
     checkAuth,
+    isAdmin: !!state.user && state.user.role === 'admin',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

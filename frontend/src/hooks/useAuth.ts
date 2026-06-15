@@ -13,6 +13,13 @@ export interface AuthContextValue extends AuthState {
   register: (username: string, email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
+  /**
+   * Client-side admin gate: derived from `user.role === 'admin'`. Used to
+   * conditionally render admin affordances (study edit / review queue / revert).
+   * The backend `@PreAuthorize('hasRole("ADMIN")')` is the authoritative guard
+   * — this flag only controls what UI the user *sees*, never what they can do.
+   */
+  isAdmin: boolean;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);

@@ -36,6 +36,12 @@ export interface UserResponse {
   username: string;
   email: string;
   is_active: boolean;
+  /**
+   * RBAC role from child-2 (`/auth/me` returns it).
+   * Used to client-gate admin affordances; the backend `@PreAuthorize` is the
+   * authoritative guard. Defaults to 'user' if absent (older servers).
+   */
+  role?: 'user' | 'admin';
 }
 
 export interface TokenResponse {
@@ -176,4 +182,100 @@ export interface ApiErrorResponse {
   message: string;
   status?: number;
   details?: unknown;
+}
+
+// ============================================================================
+// Study content versioning types (child-4 frontend integration).
+//
+// Ground-truth: backend/src/main/java/com/zhikao/backend/study/StudyDtos.java
+// All wire fields are snake_case via @JsonProperty. application.yml sets
+// `spring.jackson.default-property-inclusion: non_null`, so nullable fields are
+// OMITTED from the JSON when null (NOT emitted as `null`). Runtime-nullable
+// fields are therefore typed as optional (`field?: T`) so `undefined` is
+// type-accurate — `studyService`/components must treat them as possibly-absent.
+// Field names mirror the DTOs exactly: content_json / section_key / created_at
+// / change_summary / parent_revision_id / reviewer_username / review_note /
+// author_username / action / status / reviewed_at / updated_by.
+// ============================================================================
+
+export type SectionKey =
+  | 'study-route'
+  | 'exam-scan'
+  | 'review-rules'
+  | 'material-moves'
+  | 'question-guides'
+  | 'format-matrix'
+  | 'essay-rules'
+  | 'pitfalls'
+  | 'training-plan';
+
+/** Single live section — `content_json` is a raw JSON value (object or array). */
+export interface StudySection {
+  section_key: SectionKey;
+  content_json: unknown;
+  updated_at: string;
+  /** Omitted over the wire when null (NON_NULL inclusion). */
+  updated_by?: number;
+}
+
+export interface StudySectionsResponse {
+  sections: StudySection[];
+}
+
+/** One row in a section's history or the admin review queue. */
+export interface StudyRevisionSummary {
+  id: number;
+  section_key: SectionKey;
+  /** propose | direct_edit | approve | revert | reject | seed */
+  action: string;
+  /** proposed | published | rejected | superseded */
+  status: string;
+  /** Omitted for system-seed rows (author_id null). */
+  author_username?: string;
+  created_at: string;
+  /** Optional — submitter-entered summary of what changed. */
+  change_summary?: string;
+  /** Present only when a reviewer touched it (approve/reject). */
+  reviewer_username?: string;
+  reviewed_at?: string;
+  review_note?: string;
+  /** approve → approved proposal; revert → restored target. */
+  parent_revision_id?: number;
+}
+
+/** Revision detail — adds the content snapshot (read-only). */
+export interface StudyRevision extends StudyRevisionSummary {
+  content_json: unknown;
+}
+
+export interface StudyRevisionsResponse {
+  revisions: StudyRevisionSummary[];
+  total: number;
+}
+
+export interface StudyProposalsResponse {
+  proposals: StudyRevisionSummary[];
+  total: number;
+}
+
+export interface StudyProposeRequest {
+  content_json: unknown;
+  change_summary?: string;
+}
+
+export interface StudyEditRequest {
+  content_json: unknown;
+  change_summary?: string;
+}
+
+export interface StudyRevertRequest {
+  target_revision_id: number;
+}
+
+export interface StudyRejectRequest {
+  review_note?: string;
+}
+
+export interface StudyRejectResponse {
+  reviewed: number;
 }
