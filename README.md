@@ -31,23 +31,30 @@
 
 ## 快速开始
 
-```powershell
-.\run-dev-rare-ports.ps1
+需要 Java 21 和 Node。所有端口、密钥、CORS、数据库路径在 `application.yml` 与前端 `apiClient.ts` 都有 dev 默认值，开箱即用，无需任何环境变量或 `.env` 文件。
+
+启动后端（Java 21 + Spring Boot，默认 `:8001`）：
+
+```bash
+cd backend
+./mvnw spring-boot:run        # Windows: mvnw.cmd spring-boot:run
 ```
 
-默认端口是：
+另开一个终端启动前端（Vite，默认 `:5173`）：
 
-- 前端：`http://localhost:65124`
-- 后端 API：`http://localhost:65123`
-- 健康检查：`http://localhost:65123/health`
-
-指定常用端口：
-
-```powershell
-.\run-dev-rare-ports.ps1 -BackendPort 8001 -FrontendPort 3000
+```bash
+cd frontend
+npm install                   # 仅首次
+npm run dev
 ```
 
-根启动脚本会运行 Java 后端测试，启动 Spring Boot 后端，再启动 Vite 前端。前端 API 地址通过 `frontend/.env.local` 写入 `VITE_API_URL`。
+默认地址：
+
+- 前端：`http://localhost:5173`
+- 后端 API：`http://localhost:8001`
+- 健康检查：`http://localhost:8001/health`
+
+默认值互通：后端 CORS 已含 `localhost:5173`，前端 API baseURL 默认 `http://localhost:8001`，所以两侧都无需额外配置即可联调。如需改端口，后端用 `BACKEND_PORT`、`BACKEND_CORS_ORIGINS`，前端用 `VITE_API_URL`（指向后端）覆盖默认值。
 
 ## 技术栈
 
@@ -203,7 +210,7 @@ Push-Location backend; .\mvnw.cmd test; Pop-Location
 Push-Location backend; .\mvnw.cmd -Dtest=WritingFeedbackEvalTests test; Pop-Location
 
 # 后端开发启动
-Push-Location backend; .\dev.ps1 -Port 8001; Pop-Location
+Push-Location backend; .\mvnw.cmd spring-boot:run; Pop-Location
 
 # 后端打包
 Push-Location backend; .\mvnw.cmd package; Pop-Location
@@ -220,7 +227,7 @@ Push-Location backend; .\mvnw.cmd -q '-DskipTests' 'exec:java' '-Dexec.args=..\c
 (cd backend && ./mvnw -Dtest=WritingFeedbackEvalTests test)
 
 # 后端开发启动
-(cd backend && ./dev.sh)
+(cd backend && ./mvnw spring-boot:run)
 
 # 后端打包
 (cd backend && ./mvnw package)
@@ -302,12 +309,12 @@ CI 不依赖真实 provider API key，不会访问 OpenAI-compatible 外部服�
 
 ## 本地验收
 
-1. 运行 `.\run-dev-rare-ports.ps1 -BackendPort 8001 -FrontendPort 3000` 启动前后端。
-2. 注册新账号并登录。
-3. 打开 `/settings`，保存自己的模型 base URL、模型名、JSON 兜底和 API key。
+1. 按「快速开始」启动前后端（后端 `:8001`、前端 `:5173`）。
+2. 访问 `http://localhost:5173`，注册新账号并自动登录。
+3. 打开 `/app/settings`，保存自己的模型 base URL、模型名、JSON 兜底和 API key。
 4. 用当前登录账号的 Bearer token 调用 `GET /api/v1/writings/ai-status`，确认只返回当前账号的非秘密状态。
-5. 打开 `/writing`，提交一篇样例写作并生成评分。
-6. 打开 `/history`，确认只看到当前账号的记录并可查看详情。
-7. 退出登录后再访问 `/writing`、`/history` 和 `/settings`，应回到登录流程。
+5. 打开 `/app/writing`，提交一篇样例写作并生成评分。
+6. 打开 `/app/history`，确认只看到当前账号的记录并可查看详情。
+7. 退出登录后再访问 `/app/writing`、`/app/history` 和 `/app/settings`，应回到登录流程。
 
 **最后更新**：2026-06-10
