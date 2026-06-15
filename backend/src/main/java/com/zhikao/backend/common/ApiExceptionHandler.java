@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -34,6 +35,11 @@ public class ApiExceptionHandler {
   ResponseEntity<Map<String, String>> badCredentials() {
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
         .body(Map.of("detail", "无法验证当前用户"));
+  }
+
+  @ExceptionHandler(AccessDeniedException.class)
+  ResponseEntity<Map<String, String>> accessDenied() {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("detail", "权限不足"));
   }
 
   @ExceptionHandler(ResponseStatusException.class)

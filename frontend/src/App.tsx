@@ -10,6 +10,7 @@ import LandingPage from './app/page';
 import LoginPage from './app/login/page';
 import RegisterPage from './app/register/page';
 import DashboardPage from './app/dashboard/page';
+import StudyPage from './app/study/page';
 import WritingPage from './app/writing/page';
 import GradingPage from './app/writing/grading/page';
 import HistoryPage from './app/history/page';
@@ -62,6 +63,7 @@ function App() {
             }
           >
             <Route index element={<DashboardPage />} />
+            <Route path="study" element={<StudyPage />} />
             <Route path="writing" element={<WritingPage />} />
             <Route path="writing/grading" element={<GradingPage />} />
             <Route path="history" element={<HistoryPage />} />

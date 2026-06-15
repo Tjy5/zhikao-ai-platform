@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -40,10 +41,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       long userId = jwtService.verifyUserId(token);
       UserRecord user = users.findById(userId).filter(UserRecord::active).orElseThrow();
       CurrentUser currentUser =
-          new CurrentUser(user.id(), user.username(), user.email(), user.active());
+          new CurrentUser(
+              user.id(), user.username(), user.email(), user.active(), user.role());
+      List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+      authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+      if ("admin".equals(user.role())) {
+        authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+      }
       UsernamePasswordAuthenticationToken authentication =
-          new UsernamePasswordAuthenticationToken(
-              currentUser, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+          new UsernamePasswordAuthenticationToken(currentUser, null, authorities);
       SecurityContextHolder.getContext().setAuthentication(authentication);
     } catch (RuntimeException error) {
       SecurityContextHolder.clearContext();
