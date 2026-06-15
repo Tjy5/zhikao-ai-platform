@@ -65,11 +65,14 @@ export function CommandBar({
   aiReady,
   modelName,
 }: CommandBarProps) {
-  const { user } = useAuth();
+  const { isAdmin, user } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const avatarInitial = user?.username?.[0] ?? null;
+  const appNav = isAdmin
+    ? [...APP_NAV, { to: '/admin', label: '管理' }]
+    : APP_NAV;
 
   if (variant === 'public') {
     return (
@@ -102,7 +105,7 @@ export function CommandBar({
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1 ml-3" aria-label="主导航">
-          {APP_NAV.map((item) => (
+          {appNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -180,7 +183,7 @@ export function CommandBar({
           aria-label="移动端导航"
         >
           <div className="max-w-[1180px] mx-auto px-4 py-2 flex flex-col gap-1">
-            {APP_NAV.map((item) => (
+            {appNav.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}

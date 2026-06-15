@@ -2,7 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import RequireAuth from './components/RequireAuth';
+import RequireAdmin from './components/RequireAdmin';
 import AppLayout from './components/AppLayout';
+import AdminLayout from './components/AdminLayout';
 import ApiClientSync from './components/ApiClientSync';
 
 // Pages
@@ -15,6 +17,12 @@ import WritingPage from './app/writing/page';
 import GradingPage from './app/writing/grading/page';
 import HistoryPage from './app/history/page';
 import SettingsPage from './app/settings/page';
+import AdminDashboardPage from './app/admin/page';
+import AdminStudyPage from './app/admin/study/page';
+import AdminStudyReviewsPage from './app/admin/study/reviews/page';
+import AdminStudySectionPage from './app/admin/study/section/page';
+import AdminUsersPage from './app/admin/users/page';
+import AdminSettingsPage from './app/admin/settings/page';
 
 function App() {
   return (
@@ -68,6 +76,26 @@ function App() {
             <Route path="writing/grading" element={<GradingPage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="settings" element={<SettingsPage />} />
+          </Route>
+
+          {/* Protected admin workspace. RequireAuth preserves /login?from=...;
+              RequireAdmin then redirects authenticated non-admin users to /app. */}
+          <Route
+            path="/admin"
+            element={
+              <RequireAuth>
+                <RequireAdmin>
+                  <AdminLayout />
+                </RequireAdmin>
+              </RequireAuth>
+            }
+          >
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="study" element={<AdminStudyPage />} />
+            <Route path="study/reviews" element={<AdminStudyReviewsPage />} />
+            <Route path="study/sections/:key" element={<AdminStudySectionPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="settings" element={<AdminSettingsPage />} />
           </Route>
 
           {/* Legacy compat redirects (design.md §6) */}
