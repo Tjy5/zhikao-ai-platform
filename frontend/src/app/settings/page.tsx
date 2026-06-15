@@ -413,12 +413,12 @@ export default function SettingsPage() {
                       {settings.last_failure_classification}
                     </span>
                   )}
-                  <span className="text-[12px] text-faint">
+                  <span className="text-[12px] text-mute">
                     {new Date(settings.last_tested_at).toLocaleString('zh-CN')}
                   </span>
                 </span>
               ) : (
-                <span className="text-[12px] text-faint">尚未测试</span>
+                <span className="text-[12px] text-mute">尚未测试</span>
               )}
             </dd>
           </div>
@@ -591,7 +591,7 @@ export default function SettingsPage() {
           </Button>
         </div>
 
-        <p className="mt-3 text-[12px] text-faint leading-relaxed">
+        <p className="mt-3 text-[12px] text-mute leading-relaxed">
           「测试连接」与「发现模型」基于<b className="text-mute">已保存</b>的配置运行；如刚修改了表单，请先「保存配置」。
         </p>
       </form>
@@ -602,7 +602,7 @@ export default function SettingsPage() {
           <div className="flex-1 min-w-0">
             <h2 className="text-[14px] font-semibold text-ink">
               结构化评分输出
-              <span className="ml-2 text-[11px] font-mono text-faint align-middle">
+              <span className="ml-2 text-[11px] font-mono text-mute align-middle">
                 实验性
               </span>
             </h2>
@@ -706,7 +706,7 @@ function DiscoveryPanel({
 
   return (
     <div className="mt-2 rounded-md border border-line bg-panel/30 overflow-hidden">
-      <div className="px-3 py-1.5 border-b border-line text-[11px] font-mono text-faint">
+      <div className="px-3 py-1.5 border-b border-line text-[11px] font-mono text-mute">
         发现 {discovery.model_count} 个模型 · 点击填入
       </div>
       <ul className="max-h-[220px] overflow-y-auto divide-y divide-line">
@@ -719,7 +719,7 @@ function DiscoveryPanel({
             >
               <div className="text-[13px] font-mono text-ink">{model.id}</div>
               {model.owned_by && (
-                <div className="text-[11px] text-faint mt-0.5">
+                <div className="text-[11px] text-mute mt-0.5">
                   提供者：{model.owned_by}
                 </div>
               )}

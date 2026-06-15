@@ -199,7 +199,7 @@ export default function DashboardPage() {
               <>
                 AI 已就绪
                 {settings?.model_name && (
-                  <span className="font-mono text-faint">· {settings.model_name}</span>
+                  <span className="font-mono text-mute">· {settings.model_name}</span>
                 )}
               </>
             ) : (
@@ -219,7 +219,7 @@ export default function DashboardPage() {
           <span>
             累计 <b className="text-ink font-semibold">{stats.cumulative}</b> 篇
             {stats.cumulativePartial && (
-              <span className="text-faint text-[11px] ml-1" title="后端只返回最近 50 条">
+              <span className="text-mute text-[11px] ml-1" title="后端只返回最近 50 条">
                 （仅最近 50 条）
               </span>
             )}
@@ -240,7 +240,7 @@ export default function DashboardPage() {
         <section aria-label="最近批改" aria-busy="true">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[15px] font-semibold text-ink">最近批改</h2>
-            <span className="text-[12.5px] text-faint">加载中…</span>
+            <span className="text-[12.5px] text-mute">加载中…</span>
           </div>
           <SkeletonList rows={3} />
         </section>
@@ -312,7 +312,7 @@ export default function DashboardPage() {
                         {title}
                       </span>
                       {item.taskType && (
-                        <span className="text-[10.5px] font-mono text-faint shrink-0">
+                        <span className="text-[10.5px] font-mono text-mute shrink-0">
                           {item.taskType}
                         </span>
                       )}

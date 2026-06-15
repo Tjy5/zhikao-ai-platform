@@ -96,10 +96,10 @@ function RadarChart({
   return (
     <div className="flex flex-col items-center">
       <div className="flex items-baseline justify-between w-full mb-1">
-        <span className="text-[11px] font-medium text-faint">综合</span>
+        <span className="text-[11px] font-medium text-mute">综合</span>
         <span className="text-[26px] font-semibold text-oxblood leading-none">
           {overall.toFixed(1)}
-          <span className="text-[13px] text-faint font-normal">
+          <span className="text-[13px] text-mute font-normal">
             /{overallMax}
           </span>
         </span>
@@ -230,7 +230,7 @@ export function StructuredReport({ payload }: StructuredReportProps) {
       {/* Opt-in divider so users know this is the structured-scoring view. */}
       <div className="flex items-center gap-3 mb-4">
         <div className="h-px flex-1 bg-line" />
-        <span className="text-[11px] font-mono text-faint">
+        <span className="text-[11px] font-mono text-mute">
           结构化评分视图
         </span>
         <div className="h-px flex-1 bg-line" />
@@ -248,7 +248,7 @@ export function StructuredReport({ payload }: StructuredReportProps) {
               />
             ))
           ) : (
-            <div className="px-5 py-6 text-[12.5px] text-faint leading-relaxed">
+            <div className="px-5 py-6 text-[12.5px] text-mute leading-relaxed">
               本次未返回逐条摘录批注。
             </div>
           )}

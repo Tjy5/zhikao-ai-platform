@@ -268,7 +268,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <p className="mt-5 text-center text-[12px] text-faint leading-relaxed">
+          <p className="mt-5 text-center text-[12px] text-mute leading-relaxed">
             成公不会代你调用付费模型——你填入的 API key 仅用于你自己的批改请求。
           </p>
         </div>

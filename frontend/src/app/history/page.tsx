@@ -604,7 +604,7 @@ export default function HistoryPage() {
                             {title}
                           </span>
                           {item.taskType && (
-                            <span className="text-[10.5px] font-mono text-faint shrink-0">
+                            <span className="text-[10.5px] font-mono text-mute shrink-0">
                               {item.taskType}
                             </span>
                           )}
@@ -639,7 +639,7 @@ export default function HistoryPage() {
 
           {/* List footer note: cumulative is capped at 50 by the backend. */}
           {hasAnyRecords && (
-            <p className="mt-3 text-[11px] font-mono text-faint">
+            <p className="mt-3 text-[11px] font-mono text-mute">
               仅显示最近 50 条记录{searchTerm || timeRange !== 'all' ? '（筛选后）' : ''}。
             </p>
           )}
@@ -806,12 +806,12 @@ function HistoryDetailContent({
           <p className="text-[12.5px] text-mute mt-0.5">
             {new Date(detail.timestamp).toLocaleString('zh-CN')}
             {detail.request.task_type && (
-              <span className="ml-2 font-mono text-faint">
+              <span className="ml-2 font-mono text-mute">
                 {detail.request.task_type}
               </span>
             )}
             <span className="ml-2 text-faint">·</span>
-            <span className="ml-2 text-faint">
+            <span className="ml-2 text-mute">
               {TYPE_LABELS[detail.type] || detail.type}
             </span>
           </p>
@@ -878,7 +878,7 @@ function HistoryDetailContent({
               </button>
             </>
           ) : (
-            <p className="px-4 py-3 text-[13px] text-faint italic">
+            <p className="px-4 py-3 text-[13px] text-mute italic">
               （无原文内容）
             </p>
           )}

@@ -102,7 +102,7 @@ function SectionBlock({ section }: { section: FeedbackSection }) {
             {body}
           </p>
         ) : (
-          <p className="mt-2 text-[13px] text-faint">（本段缺失）</p>
+          <p className="mt-2 text-[13px] text-mute">（本段缺失）</p>
         )}
       </section>
     );
@@ -127,7 +127,7 @@ function SectionBlock({ section }: { section: FeedbackSection }) {
         ) : body ? (
           <p className="mt-2 text-[14px] text-ink leading-[1.85]">{body}</p>
         ) : (
-          <p className="mt-2 text-[13px] text-faint">（本段缺失）</p>
+          <p className="mt-2 text-[13px] text-mute">（本段缺失）</p>
         )}
       </section>
     );
@@ -150,7 +150,7 @@ function SectionBlock({ section }: { section: FeedbackSection }) {
         ) : body ? (
           <p className="mt-2 text-[14px] text-ink leading-[1.85]">{body}</p>
         ) : (
-          <p className="mt-2 text-[13px] text-faint">（本段缺失）</p>
+          <p className="mt-2 text-[13px] text-mute">（本段缺失）</p>
         )}
       </section>
     );
@@ -169,7 +169,7 @@ function SectionBlock({ section }: { section: FeedbackSection }) {
           {body}
         </p>
       ) : (
-        <p className="mt-2 text-[13px] text-faint">（本段缺失）</p>
+        <p className="mt-2 text-[13px] text-mute">（本段缺失）</p>
       )}
     </section>
   );
@@ -251,7 +251,7 @@ export function GradingReport({
         </Pin>
         <span className="text-[13px] text-ink font-medium">批阅完成</span>
         {metaText && (
-          <span className="ml-auto font-mono text-[11px] text-faint">
+          <span className="ml-auto font-mono text-[11px] text-mute">
             {metaText}
           </span>
         )}
@@ -327,7 +327,7 @@ export function GradingReport({
       </div>
 
       {markdown.trim().length < MIN_CONTENT_CHARS && (
-        <p className="mt-3 text-[11.5px] text-faint leading-relaxed">
+        <p className="mt-3 text-[11.5px] text-mute leading-relaxed">
           本次批阅内容较短，仅供参考。
         </p>
       )}

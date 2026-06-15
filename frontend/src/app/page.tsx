@@ -138,7 +138,7 @@ function HeroReportCard() {
           </Pin>
           <span className="font-medium text-ink">本次批阅</span>
           <span className="text-faint">·</span>
-          <span className="font-mono text-faint">
+          <span className="font-mono text-mute">
             {SAMPLE_META.model} ·{' '}
             {(SAMPLE_META.durationMs / 1000).toFixed(1)}s
           </span>
@@ -231,7 +231,7 @@ export default function LandingPage() {
           <div className="max-w-[1180px] mx-auto px-4 md:px-6 py-12 md:py-20 grid grid-cols-1 lg:grid-cols-[5fr_7fr] gap-10 lg:gap-14 items-center">
             {/* Thesis */}
             <div>
-              <div className="inline-flex items-center gap-2 text-[11px] font-mono text-faint border border-line rounded-full px-2.5 py-1 mb-5">
+              <div className="inline-flex items-center gap-2 text-[11px] font-mono text-mute border border-line rounded-full px-2.5 py-1 mb-5">
                 <span className="w-1.5 h-1.5 rounded-full bg-mark" aria-hidden="true" />
                 智能公考 · 申论写作批改
               </div>
@@ -267,7 +267,7 @@ export default function LandingPage() {
               </div>
 
               {/* Trust badges */}
-              <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-faint">
+              <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-mute">
                 <span className="inline-flex items-center gap-1.5">
                   <CheckOk className="w-3.5 h-3.5 text-ok" />
                   接入你自己的 OpenAI 兼容模型
@@ -287,7 +287,7 @@ export default function LandingPage() {
         {/* ===== THE LOOP (real four-step sequence) ===== */}
         <section className="border-b border-line">
           <div className="max-w-[1180px] mx-auto px-4 md:px-6 py-12 md:py-16">
-            <h2 className="text-[13px] font-mono uppercase tracking-wider text-faint mb-2">
+            <h2 className="text-[13px] font-mono uppercase tracking-wider text-mute mb-2">
               练习闭环
             </h2>
             <p className="text-[20px] md:text-[24px] font-semibold tracking-tight text-ink mb-8">
@@ -320,7 +320,7 @@ export default function LandingPage() {
         >
           <div className="max-w-[1100px] mx-auto px-4 md:px-6 py-12 md:py-16">
             <div className="max-w-[60ch] mb-8">
-              <h2 className="text-[13px] font-mono uppercase tracking-wider text-faint mb-2">
+              <h2 className="text-[13px] font-mono uppercase tracking-wider text-mute mb-2">
                 一篇批改长这样
               </h2>
               <p className="text-[20px] md:text-[24px] font-semibold tracking-tight text-ink">
@@ -362,7 +362,7 @@ export default function LandingPage() {
 
       {/* ===== FOOTER ===== */}
       <footer className="border-t border-line">
-        <div className="max-w-[1180px] mx-auto px-4 md:px-6 py-6 flex flex-wrap items-center gap-3 text-[12px] text-faint">
+        <div className="max-w-[1180px] mx-auto px-4 md:px-6 py-6 flex flex-wrap items-center gap-3 text-[12px] text-mute">
           <span className="grid place-items-center w-6 h-6 rounded bg-mark text-white font-bold text-[12px]">
             成
           </span>

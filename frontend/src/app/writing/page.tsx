@@ -173,7 +173,7 @@ export default function WritingPage() {
             {validationError ? (
               <span className="text-mark">{validationError}</span>
             ) : (
-              <span className="text-faint">
+              <span className="text-mute">
                 已写 {charCount} 字 · 进度 {Math.round(progress)}%
               </span>
             )}
@@ -186,25 +186,25 @@ export default function WritingPage() {
           <div className="rounded-lg border border-line bg-panel/50 p-4">
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-[12.5px]">
               <div>
-                <div className="text-faint">字数</div>
+                <div className="text-mute">字数</div>
                 <div className="text-[18px] font-semibold text-ink leading-tight mt-0.5">
                   {wordCount}
                 </div>
               </div>
               <div>
-                <div className="text-faint">字符</div>
+                <div className="text-mute">字符</div>
                 <div className="text-[18px] font-semibold text-ink leading-tight mt-0.5">
                   {charCount}
                 </div>
               </div>
               <div>
-                <div className="text-faint">段落</div>
+                <div className="text-mute">段落</div>
                 <div className="text-[18px] font-semibold text-ink leading-tight mt-0.5">
                   {paragraphCount}
                 </div>
               </div>
               <div>
-                <div className="text-faint">预估批改</div>
+                <div className="text-mute">预估批改</div>
                 <div className="text-[18px] font-semibold text-ink leading-tight mt-0.5">
                   {estimatedSeconds > 0 ? `约 ${estimatedSeconds}s` : '—'}
                 </div>
@@ -213,7 +213,7 @@ export default function WritingPage() {
 
             {/* Progress vs minimum */}
             <div className="mt-3">
-              <div className="flex items-center justify-between text-[11px] text-faint mb-1">
+              <div className="flex items-center justify-between text-[11px] text-mute mb-1">
                 <span>最低 {MIN_CONTENT_LENGTH} 字</span>
                 <span>{Math.round(progress)}%</span>
               </div>
@@ -230,7 +230,7 @@ export default function WritingPage() {
           <div className="rounded-lg border border-line bg-paper p-4">
             <label
               htmlFor="writing-task-type"
-              className="block text-[11px] font-medium text-faint mb-1.5"
+              className="block text-[11px] font-medium text-mute mb-1.5"
             >
               任务类型（可选）
             </label>
@@ -246,10 +246,10 @@ export default function WritingPage() {
           {/* Rubric-dimension preview — EMPTY bars, no scores (no fake data). */}
           <div className="rounded-lg border border-line bg-paper p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-medium text-faint">
+              <span className="text-[11px] font-medium text-mute">
                 评分维度预览
               </span>
-              <span className="text-[10.5px] font-mono text-faint">
+              <span className="text-[10.5px] font-mono text-mute">
                 批改后展示
               </span>
             </div>
@@ -260,7 +260,7 @@ export default function WritingPage() {
                     {dim}
                   </span>
                   <div className="flex-1 h-1.5 rounded-full bg-line" />
-                  <span className="text-[11px] font-mono text-faint w-6 text-right">
+                  <span className="text-[11px] font-mono text-mute w-6 text-right">
                     —
                   </span>
                 </li>

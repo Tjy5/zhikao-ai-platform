@@ -213,7 +213,7 @@ export default function LoginPage() {
           </div>
 
           {/* Subtle footnote: this is a public page; reinforce trust */}
-          <p className="mt-5 text-center text-[12px] text-faint leading-relaxed">
+          <p className="mt-5 text-center text-[12px] text-mute leading-relaxed">
             注册后可接入你自己的 OpenAI 兼容模型，批改历史仅保存在你的账号下。
           </p>
         </div>

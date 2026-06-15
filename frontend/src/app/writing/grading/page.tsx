@@ -253,7 +253,7 @@ function ErrorView({ info, onRetry, onBackToWriting }: ErrorViewProps) {
           {info.message}
         </p>
         {info.classification && info.classification !== 'network' && (
-          <p className="text-[11px] font-mono text-faint mt-1.5">
+          <p className="text-[11px] font-mono text-mute mt-1.5">
             分类：{info.classification}
           </p>
         )}

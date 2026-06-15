@@ -93,7 +93,7 @@ export function StageTrace({
             <div
               className={[
                 'inline-flex items-center gap-1.5 font-medium shrink-0',
-                isDone || isActive ? 'text-ink' : 'text-faint',
+                isDone || isActive ? 'text-ink' : 'text-mute',
               ].join(' ')}
               role="listitem"
               aria-current={isActive ? 'step' : undefined}
