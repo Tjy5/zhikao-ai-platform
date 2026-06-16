@@ -1,6 +1,12 @@
+import { useContext } from 'react';
 import type { ReactNode } from 'react';
 import { Pin } from '../ui/Pin';
 import { SECTION_META } from '../../app/study/baseline';
+import { pointIdFor } from '../../app/study/sectionOutline';
+import {
+  SectionAnchorContext,
+  type SectionAnchorContextValue,
+} from './SectionAnchorContext';
 import type {
   KnowledgeCard,
   ReviewRule,
@@ -23,6 +29,13 @@ import type { SectionKey } from '../../types/api';
  *
  * `actions` is an optional slot rendered top-right of the section head
  * (edit / history buttons on the live page; empty for snapshots).
+ *
+ * `anchorIdPrefix` — when set, every body item renders a stable `id` on its
+ * top-level element via `pointIdFor(prefix, i)`, so the `/app/study` rail +
+ * scroll-spy can target it. **Snapshots MUST NOT pass this prop** (they pass
+ * none) — without a prefix the ids are suppressed, keeping snapshot markup
+ * id-unique even when multiple revisions of one section render side by side
+ * (see design.md §5 — this is the load-bearing snapshot-safety decision).
  *
  * Robustness: unknown / malformed `content` falls back to a read-only JSON
  * block (design.md §5) — never throws.
@@ -93,22 +106,29 @@ function SecLabel({
 /**
  * Divider grid — gap-px on a bg-line grid draws 1px dividers between cells
  * (design.md §12 — only for REAL sequences, never visually-similar cards).
+ *
+ * `idFor` — when supplied, each cell `<div>` gets `id={idFor(i)}` so the
+ * `/app/study` rail / scroll-spy can target the i-th knowledge point. The live
+ * page passes it (via `SectionAnchorContext`); snapshots do not, so no ids are
+ * ever rendered there.
  */
 function StepGrid<T>({
   items,
   cols = 'md:grid-cols-2 lg:grid-cols-4',
   render,
+  idFor,
 }: {
   items: readonly T[];
   cols?: string;
   render: (item: T, index: number) => ReactNode;
+  idFor?: (index: number) => string;
 }) {
   return (
     <div
       className={`grid grid-cols-1 ${cols} gap-px bg-line rounded-xl overflow-hidden border border-line`}
     >
       {items.map((item, i) => (
-        <div key={i} className="bg-paper p-5">
+        <div key={i} id={idFor?.(i)} className="bg-paper p-5">
           {render(item, i)}
         </div>
       ))}
@@ -154,12 +174,14 @@ function JsonFallback({ content }: { content: unknown }) {
 // ----------------------------------------------------------------------------
 
 function StudyRouteBody({ content }: { content: unknown }) {
+  const { pointId } = useContext(SectionAnchorContext);
   if (!isRecord(content)) return <JsonFallback content={content} />;
   const steps = Array.isArray(content.steps) ? content.steps : [];
   return (
     <StepGrid
       items={steps}
       cols="md:grid-cols-3 lg:grid-cols-5"
+      idFor={pointId}
       render={(step: unknown, i) => {
         const s = isRecord(step) ? step : {};
         const label = typeof s.label === 'string' ? s.label : '';
@@ -183,11 +205,13 @@ function KnowledgeCardsBody({
 }: {
   content: unknown;
 }) {
+  const { pointId } = useContext(SectionAnchorContext);
   if (!Array.isArray(content)) return <JsonFallback content={content} />;
   const cards = content.filter(isRecord) as unknown as KnowledgeCard[];
   return (
     <StepGrid
       items={cards}
+      idFor={pointId}
       render={(card, i) => {
         const eyebrow = typeof card.eyebrow === 'string' ? card.eyebrow : '';
         const title = typeof card.title === 'string' ? card.title : '';
@@ -220,6 +244,7 @@ function KnowledgeCardsBody({
 }
 
 function ReviewRulesBody({ content }: { content: unknown }) {
+  const { pointId } = useContext(SectionAnchorContext);
   if (!Array.isArray(content)) return <JsonFallback content={content} />;
   const rules = content.filter(isRecord) as unknown as ReviewRule[];
   return (
@@ -229,7 +254,7 @@ function ReviewRulesBody({ content }: { content: unknown }) {
         const cue = typeof rule.cue === 'string' ? rule.cue : '';
         const detail = typeof rule.detail === 'string' ? rule.detail : '';
         return (
-          <li key={title || i} className="flex gap-4">
+          <li key={title || i} id={pointId?.(i)} className="flex gap-4">
             <Pin className="mt-1 shrink-0">{i + 1}</Pin>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
@@ -248,6 +273,7 @@ function ReviewRulesBody({ content }: { content: unknown }) {
 }
 
 function QuestionGuidesBody({ content }: { content: unknown }) {
+  const { pointId } = useContext(SectionAnchorContext);
   if (!Array.isArray(content)) return <JsonFallback content={content} />;
   const guides = content.filter(isRecord) as unknown as QuestionGuide[];
   return (
@@ -263,6 +289,7 @@ function QuestionGuidesBody({ content }: { content: unknown }) {
         return (
           <article
             key={title || gi}
+            id={pointId?.(gi)}
             className="rounded-xl border border-line bg-paper p-5 md:p-6"
           >
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -323,6 +350,7 @@ function QuestionGuidesBody({ content }: { content: unknown }) {
 }
 
 function FormatMatrixBody({ content }: { content: unknown }) {
+  const { pointId } = useContext(SectionAnchorContext);
   if (!Array.isArray(content)) return <JsonFallback content={content} />;
   const rows = content.filter(isRecord) as unknown as FormatRow[];
   return (
@@ -351,7 +379,7 @@ function FormatMatrixBody({ content }: { content: unknown }) {
             const body = typeof row.body === 'string' ? row.body : '';
             const caution = typeof row.caution === 'string' ? row.caution : '';
             return (
-              <tr key={genre || i} className="border-b border-line last:border-b-0">
+              <tr key={genre || i} id={pointId?.(i)} className="border-b border-line last:border-b-0">
                 <td className="px-4 py-3.5 text-[13px] text-ink align-top">{genre}</td>
                 <td className="px-4 py-3.5 text-[13px] text-ink align-top">{format}</td>
                 <td className="px-4 py-3.5 text-[13px] text-mute leading-relaxed align-top">
@@ -370,11 +398,13 @@ function FormatMatrixBody({ content }: { content: unknown }) {
 }
 
 function EssayRulesBody({ content }: { content: unknown }) {
+  const { pointId } = useContext(SectionAnchorContext);
   if (!Array.isArray(content)) return <JsonFallback content={content} />;
   const rules = content.filter(isRecord) as unknown as EssayRule[];
   return (
     <StepGrid
       items={rules}
+      idFor={pointId}
       render={(rule, i) => {
         const title = typeof rule.title === 'string' ? rule.title : '';
         const detail = typeof rule.detail === 'string' ? rule.detail : '';
@@ -402,6 +432,7 @@ function EssayRulesBody({ content }: { content: unknown }) {
 }
 
 function PitfallsBody({ content }: { content: unknown }) {
+  const { pointId } = useContext(SectionAnchorContext);
   if (!Array.isArray(content)) return <JsonFallback content={content} />;
   const items = content.filter(isRecord) as unknown as Pitfall[];
   return (
@@ -411,7 +442,7 @@ function PitfallsBody({ content }: { content: unknown }) {
         const correction =
           typeof item.correction === 'string' ? item.correction : '';
         return (
-          <li key={issue || i} className="bg-paper p-4 md:p-5">
+          <li key={issue || i} id={pointId?.(i)} className="bg-paper p-4 md:p-5">
             <div className="flex gap-2.5">
               <AlertMark className="mt-0.5 w-4 h-4 text-mark shrink-0" />
               <h3 className="text-[13.5px] font-medium text-ink leading-relaxed">
@@ -429,6 +460,7 @@ function PitfallsBody({ content }: { content: unknown }) {
 }
 
 function TrainingPlanBody({ content }: { content: unknown }) {
+  const { pointId } = useContext(SectionAnchorContext);
   if (!isRecord(content)) return <JsonFallback content={content} />;
   const c = content as Partial<TrainingPlanContent>;
   const weeks = Array.isArray(c.weeks)
@@ -444,6 +476,7 @@ function TrainingPlanBody({ content }: { content: unknown }) {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)]">
       <StepGrid
         items={weeks}
+        idFor={pointId}
         render={(week, i) => {
           const w =
             typeof week.week === 'string' ? week.week : '';
@@ -507,6 +540,12 @@ export interface SectionViewProps {
   actions?: ReactNode;
   /** Skip the static SectionHead chrome (snapshot may render its own header). */
   hideHead?: boolean;
+  /**
+   * When set, each body item renders `id={pointIdFor(prefix, i)}` so the
+   * `/app/study` rail + scroll-spy can target it. Snapshots MUST NOT pass this
+   * (the default `undefined` suppresses all ids → duplicate-id-safe).
+   */
+  anchorIdPrefix?: string;
 }
 
 export function SectionView({
@@ -514,8 +553,16 @@ export function SectionView({
   content,
   actions,
   hideHead = false,
+  anchorIdPrefix,
 }: SectionViewProps) {
   const meta = SECTION_META[sectionKey];
+
+  // Provide an id resolver only when a prefix is passed. The formula lives in
+  // `pointIdFor` (single source of truth — the rail imports the same helper, so
+  // rail click → scroll target always matches the rendered id).
+  const anchorValue: SectionAnchorContextValue = anchorIdPrefix
+    ? { pointId: (i: number) => pointIdFor(anchorIdPrefix, i) }
+    : { pointId: undefined };
 
   // study-route's desc is data-driven off `content.lead` (baseline lead === the
   // static desc, so byte-identical for fallback). Other sections use chrome.
@@ -549,26 +596,28 @@ export function SectionView({
   };
 
   return (
-    <section aria-labelledby={meta.headId}>
-      {hideHead ? null : (
-        <div className="mb-6 md:mb-8 flex items-start justify-between gap-4 flex-wrap">
-          <div className="max-w-[70ch]">
-            <SecLabel>{meta.eyebrow}</SecLabel>
-            <h2
-              id={meta.headId}
-              className="mt-2 text-[22px] md:text-[26px] font-semibold tracking-tight text-ink leading-tight"
-            >
-              {meta.title}
-            </h2>
-            <p className="mt-2.5 text-[14px] text-mute leading-[1.75]">{desc}</p>
+    <SectionAnchorContext.Provider value={anchorValue}>
+      <section aria-labelledby={meta.headId}>
+        {hideHead ? null : (
+          <div className="mb-6 md:mb-8 flex items-start justify-between gap-4 flex-wrap">
+            <div className="max-w-[70ch]">
+              <SecLabel>{meta.eyebrow}</SecLabel>
+              <h2
+                id={meta.headId}
+                className="mt-2 text-[22px] md:text-[26px] font-semibold tracking-tight text-ink leading-tight"
+              >
+                {meta.title}
+              </h2>
+              <p className="mt-2.5 text-[14px] text-mute leading-[1.75]">{desc}</p>
+            </div>
+            {actions ? (
+              <div className="flex items-center gap-2 shrink-0 mt-1">{actions}</div>
+            ) : null}
           </div>
-          {actions ? (
-            <div className="flex items-center gap-2 shrink-0 mt-1">{actions}</div>
-          ) : null}
-        </div>
-      )}
-      {renderBody()}
-    </section>
+        )}
+        {renderBody()}
+      </section>
+    </SectionAnchorContext.Provider>
   );
 }
 

@@ -1,20 +1,24 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Toast, type ToastType } from '../../components/ui/Toast';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { SectionView } from '../../components/study/SectionView';
 import { SectionEditor } from '../../components/study/SectionEditor';
+import { StudyNav } from '../../components/study/StudyNav';
 import { useAuth } from '../../hooks/useAuth';
 import { useOperationPolicy } from '../../hooks/useOperationPolicy';
 import { useStudySections } from '../../hooks/useStudySections';
+import { useScrollSpy } from '../../hooks/useScrollSpy';
 import { studyService } from '../../services/studyService';
 import { AppError, ErrorType } from '../../types/domain';
 import {
   BASELINE_SECTIONS,
+  SECTION_LABELS,
   SECTION_ORDER,
 } from './baseline';
+import { sectionOutline, pointIdFor } from './sectionOutline';
 import type { SectionKey } from '../../types/api';
 
 // Re-export so callers can import the packed fallback from the page module
@@ -22,7 +26,20 @@ import type { SectionKey } from '../../types/api';
 export { BASELINE_SECTIONS };
 
 /**
- * /app/study — learner-facing 申论学习 read + proposal view.
+ * /app/study — learner-facing 申论学习 read + proposal view, restructured as a
+ * focused single-module reader with a two-level in-page navigation rail
+ * (design.md for this task).
+ *
+ * Layout (design.md §2):
+ *  - HERO (page identity + stat strip + CTAs + admin links + proposal notice)
+ *    on EVERY module view;
+ *  - desktop: persistent two-level rail (sticky under the CommandBar) + a
+ *    focused `<article>` rendering ONE module in full + a prev/next module
+ *    pager;
+ *  - mobile/tablet (`< lg`): the same rail lives in a slide-in drawer opened
+ *    from a top bar;
+ *  - selecting a knowledge point scrolls to its in-page anchor + highlights it
+ *    (scroll-spy reflects the active point in the rail).
  *
  * Read path: `useStudySections()` is API-first with a packed-baseline fallback
  * — the page is NEVER blank. On API failure/empty it renders the baseline
@@ -33,13 +50,17 @@ export { BASELINE_SECTIONS };
  * policy allows content proposals. Admin governance lives under `/admin/study/*`;
  * this learner page only links admins there.
  *
- * Anti-pattern compliance (design.md §12) is preserved verbatim from child-1:
- * inline mono stat strip (not big-number cards), gap-px divider grids for real
+ * Anti-pattern compliance (design.md §12) is preserved: inline mono stat strip
+ * (not big-number cards), gap-px divider grids via SectionView for real
  * sequences only, inline SVG (no icon library), all sans, OKLCH tokens only.
+ * The in-page left rail is the documented scoped §12 exception (design.md §1.7)
+ * — it does not replace the top CommandBar.
  */
 
+const ANCHOR_PREFIX = 'study';
+
 // ----------------------------------------------------------------------------
-// Inline SVG icon — design.md §2 (no icon library). Hero CTA chevron only.
+// Inline SVG icons — design.md §2 (no icon library). currentColor, aria-hidden.
 // ----------------------------------------------------------------------------
 
 function ArrowRight({ className = '' }: { className?: string }) {
@@ -57,6 +78,55 @@ function ArrowRight({ className = '' }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function ArrowLeft({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        d="M19 12H5M11 6l-6 6 6 6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function MenuIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      aria-hidden="true"
+    >
+      <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloseIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      aria-hidden="true"
+    >
+      <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
     </svg>
   );
 }
@@ -151,9 +221,23 @@ export default function StudyPage() {
     reload: reloadPolicy,
   } = useOperationPolicy();
 
+  // Active module from the URL. Bare `/app/study` is redirected in App.tsx to
+  // `/app/study/study-route`; an unknown key here is also redirected below.
+  const { sectionKey: rawSectionKey } = useParams<{ sectionKey: string }>();
+  const activeKey = useMemo(
+    () =>
+      rawSectionKey && (SECTION_ORDER as string[]).includes(rawSectionKey)
+        ? (rawSectionKey as SectionKey)
+        : null,
+    [rawSectionKey]
+  );
+
   // Overlays.
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Mobile drawer open state (design.md §2.2). Desktop rail is always visible.
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Toast.
   const [toast, setToast] = useState<{
@@ -238,9 +322,70 @@ export default function StudyPage() {
   const showProposalNotice =
     showControls && !isAdmin && policyPhase !== 'loading' && !proposalsEnabled;
 
+  // ----- Two-level outline for the active module (data-driven, same source
+  //       SectionView reads, so rail labels and rendered items never drift). -----
+  const activeContent = activeKey ? sections[activeKey] : undefined;
+  const points = useMemo(
+    () => (activeKey ? sectionOutline(activeKey, activeContent) : []),
+    [activeKey, activeContent]
+  );
+  // Stable point-id list for scroll-spy (same formula SectionView renders).
+  const pointIds = useMemo(
+    () => points.map((_, i) => pointIdFor(ANCHOR_PREFIX, i)),
+    [points]
+  );
+
+  // Scroll-spy runs only for the focused reader (ready|fallback), never on a
+  // loading skeleton or while the drawer is mid-open.
+  const spyEnabled = phase === 'ready' || phase === 'fallback';
+  const activePoint = useScrollSpy(pointIds, spyEnabled);
+
+  // Scroll a selected knowledge point into view + give immediate rail feedback
+  // (the spy re-affirms on scroll settle). Closes the mobile drawer.
+  const selectPoint = useCallback(
+    (i: number) => {
+      const el = document.getElementById(pointIdFor(ANCHOR_PREFIX, i));
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      setDrawerOpen(false);
+    },
+    []
+  );
+
+  // Prev / next module for the pager (design.md §9).
+  const activeIndex = activeKey
+    ? SECTION_ORDER.indexOf(activeKey)
+    : -1;
+  const prevKey =
+    activeKey && activeIndex > 0 ? SECTION_ORDER[activeIndex - 1] : null;
+  const nextKey =
+    activeKey && activeIndex >= 0 && activeIndex < SECTION_ORDER.length - 1
+      ? SECTION_ORDER[activeIndex + 1]
+      : null;
+
+  // Close the mobile drawer on Escape (focus moves back to the trigger via the
+  // drawer's own focus handling on close; here we just unmount it).
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
+
+  // ----- Route guard: unknown / missing :sectionKey → overview module. This
+  //       Navigate runs AFTER every hook above, so the hook order is stable. -----
+  if (!activeKey) {
+    return <Navigate to="/app/study/study-route" replace />;
+  }
+
   return (
-    <div className="space-y-14 md:space-y-20">
-      {/* ===== HERO — page head + inline mono stat strip + learner CTAs ===== */}
+    <div className="space-y-10 md:space-y-12">
+      {/* ===== HERO — page head + inline mono stat strip + learner CTAs =====
+          Renders above the active module on EVERY module view (decision 6) so
+          page identity + CTAs + proposal notice stay consistent. */}
       <section aria-labelledby="study-hero-title">
         <div className="text-[11px] font-semibold tracking-[0.02em] text-oxblood">
           申论学习 · 知识地图
@@ -357,7 +502,8 @@ export default function StudyPage() {
         </section>
       )}
 
-      {/* ===== Sections (ready OR fallback — both render content) ===== */}
+      {/* ===== Focused single-module reader (ready OR fallback — both render
+            content). The rail + pager wrap a single SectionView. ===== */}
       {(phase === 'ready' || phase === 'fallback') && (
         <>
           {phase === 'fallback' && (
@@ -369,15 +515,142 @@ export default function StudyPage() {
               修改建议入口会在连接恢复且平台开放提案后可用。
             </div>
           )}
-          {SECTION_ORDER.map((key) => (
-            <SectionView
-              key={key}
-              sectionKey={key}
-              content={sections[key]}
-              actions={renderSectionActions(key)}
-            />
-          ))}
+
+          {/* Mobile drawer trigger bar — only below lg. Shows the active module
+              label so the reader always knows where they are. */}
+          <div className="lg:hidden -mx-4 px-4 sticky top-14 z-10 bg-paper/95 backdrop-blur-sm border-b border-line py-2.5 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-expanded={drawerOpen}
+              aria-controls="study-nav-drawer"
+              className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium text-ink transition-ui hover:bg-panel"
+            >
+              <MenuIcon className="w-4 h-4" />
+              模块
+            </button>
+            <span className="text-[12.5px] text-mute truncate">
+              {SECTION_LABELS[activeKey]}
+            </span>
+          </div>
+
+          <div className="grid lg:grid-cols-[15rem_minmax(0,1fr)] gap-8 items-start">
+            {/* Desktop rail — sticky under the CommandBar (top-20 = 5rem,
+                coupled with the scroll-margin-top in globals.css). */}
+            <aside className="hidden lg:block">
+              <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] overflow-y-auto pr-1">
+                <StudyNav
+                  active={activeKey}
+                  activePoint={activePoint}
+                  points={points}
+                  onSelectPoint={selectPoint}
+                />
+              </div>
+            </aside>
+
+            {/* Focused active module (whole-module render; point selection
+                scrolls + highlights, never filters the content). */}
+            <article className="min-w-0">
+              <SectionView
+                sectionKey={activeKey}
+                content={sections[activeKey]}
+                actions={renderSectionActions(activeKey)}
+                anchorIdPrefix={ANCHOR_PREFIX}
+              />
+
+              {/* Prev / next module pager (design.md §9) — not in the HERO so
+                  the HERO stays stable across modules. Missing side is simply
+                  omitted (no greyed control). */}
+              <nav
+                aria-label="模块切换"
+                className="mt-12 pt-6 border-t border-line grid grid-cols-1 sm:grid-cols-2 gap-3"
+              >
+                {prevKey ? (
+                  <Link
+                    to={`/app/study/${prevKey}`}
+                    className="group flex items-start gap-3 rounded-lg border border-line bg-paper px-4 py-3 transition-ui hover:bg-panel"
+                  >
+                    <ArrowLeft className="mt-0.5 w-4 h-4 text-mute shrink-0 group-hover:text-ink transition-ui" />
+                    <span className="min-w-0">
+                      <span className="block text-[11px] font-mono text-mute">
+                        上一模块
+                      </span>
+                      <span className="block text-[13.5px] font-medium text-ink truncate">
+                        {SECTION_LABELS[prevKey]}
+                      </span>
+                    </span>
+                  </Link>
+                ) : (
+                  <span aria-hidden="true" className="hidden sm:block" />
+                )}
+                {nextKey ? (
+                  <Link
+                    to={`/app/study/${nextKey}`}
+                    className="group flex items-start justify-end gap-3 rounded-lg border border-line bg-paper px-4 py-3 text-right transition-ui hover:bg-panel sm:col-start-2"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-[11px] font-mono text-mute">
+                        下一模块
+                      </span>
+                      <span className="block text-[13.5px] font-medium text-ink truncate">
+                        {SECTION_LABELS[nextKey]}
+                      </span>
+                    </span>
+                    <ArrowRight className="mt-0.5 w-4 h-4 text-mute shrink-0 group-hover:text-ink transition-ui" />
+                  </Link>
+                ) : (
+                  <span aria-hidden="true" className="hidden sm:block" />
+                )}
+              </nav>
+            </article>
+          </div>
         </>
+      )}
+
+      {/* ===== Mobile drawer — slide-in panel reusing StudyNav (no markup
+            duplication). Backdrop + Escape close; selecting any item closes. ===== */}
+      {drawerOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-ink/50 backdrop-blur-sm"
+          onClick={() => setDrawerOpen(false)}
+          role="button"
+          aria-label="关闭模块导航"
+          tabIndex={-1}
+        >
+          <div
+            id="study-nav-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="申论学习模块导航"
+            className="absolute left-0 top-0 h-full w-[80%] max-w-[20rem] bg-paper shadow-[0_10px_30px_-12px_oklch(0.24_0.02_262/0.30)] overflow-y-auto p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[13px] font-semibold text-ink">
+                申论学习模块
+              </span>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                aria-label="关闭模块导航"
+                className="grid place-items-center w-9 h-9 rounded-md text-mute transition-ui hover:bg-panel hover:text-ink"
+              >
+                <CloseIcon className="w-4 h-4" />
+              </button>
+            </div>
+            {/* The Link onSelectPoint handler closes the drawer (selectPoint
+                also closes it for point buttons); module links navigate, which
+                unmounts the drawer anyway. */}
+            <div onClick={() => setDrawerOpen(false)} className="[&_a]:cursor-pointer">
+              <StudyNav
+                active={activeKey}
+                activePoint={activePoint}
+                points={points}
+                onSelectPoint={selectPoint}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ===== Editor overlay ===== */}

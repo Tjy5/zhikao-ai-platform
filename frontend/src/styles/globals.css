@@ -115,6 +115,21 @@
     line-height: 2rem;
   }
 
+  /*
+   * Scroll-margin for /app/study knowledge-point anchors. The CommandBar is
+   * sticky `top-0` at h-14 (56px); without this, `scrollIntoView` would land a
+   * clicked point hidden under the bar. 5rem = 56px bar + 24px gap, matching
+   * the rail's `lg:sticky lg:top-20` offset so clicked points land flush with
+   * the rail's top edge (design.md §8 — rail-top and scroll-mt are a coupled
+   * pair; move both together if CommandBar height ever changes).
+   * Scoped to learner point ids only so admin/revision SectionView snapshots
+   * (which never pass `anchorIdPrefix`, so never render these ids) are
+   * unaffected.
+   */
+  [id^='study-pt-'] {
+    scroll-margin-top: 5rem;
+  }
+
   /* Reduced motion: degrade all animation/transition. */
   @media (prefers-reduced-motion: reduce) {
     *,

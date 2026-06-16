@@ -71,7 +71,13 @@ function App() {
             }
           >
             <Route index element={<DashboardPage />} />
-            <Route path="study" element={<StudyPage />} />
+            {/* /app/study redirects to the overview module; per-module deep
+                links live under study/:sectionKey (validated in StudyPage). */}
+            <Route
+              path="study"
+              element={<Navigate to="/app/study/study-route" replace />}
+            />
+            <Route path="study/:sectionKey" element={<StudyPage />} />
             <Route path="writing" element={<WritingPage />} />
             <Route path="writing/grading" element={<GradingPage />} />
             <Route path="history" element={<HistoryPage />} />
