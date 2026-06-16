@@ -93,7 +93,13 @@
 运行校验：
 
 ```powershell
-python backend/scripts/validate_content_packs.py
+cd backend
+.\mvnw.cmd -q '-DskipTests' 'exec:java' '-Dexec.args=..\content-samples'
+```
+
+```bash
+cd backend
+./mvnw -q -DskipTests exec:java -Dexec.args="../content-samples"
 ```
 
 校验器只能提供工程门禁，不能证明内容绝对无风险。内容相似性、授权链和司法辖区问题仍需人工判断。

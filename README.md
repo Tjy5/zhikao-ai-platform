@@ -96,9 +96,11 @@ writing-feedback-platform/
 │   ├── src/main/java/         # API、服务、数据访问、安全和内容校验
 │   ├── src/main/resources/    # application.yml 和 Flyway 迁移
 │   └── src/test/              # JUnit / MockMvc / 离线 AI 输出合同回归测试
-├── .github/workflows/ci.yml   # 后端和前端质量门禁
 ├── content-samples/           # 原创/官方来源示例内容包，不含真题或网课材料
-└── docs/                      # 当前保留文档
+├── CONTENT_POLICY.md          # 公开内容边界和校验规则
+├── CONTRIBUTING_CONTENT.md    # 内容贡献格式和审核要求
+├── ATTRIBUTIONS.md            # 公开内容和许可证归属记录
+└── SECURITY.md                # 漏洞报告和安全范围
 ```
 
 ## 后端配置
@@ -158,7 +160,7 @@ VITE_DEBUG=false
 - **离线输出合同回归**：`backend/src/test/resources/eval/writing-feedback-benchmark.json` 保存原创写作任务的正负样例，`WritingFeedbackEvalTests` 校验 Markdown 反馈必须包含任务类型、综合评价、亮点、改进建议、参考优化、rubric 维度和可执行建议。
 - **密钥治理**：用户 provider API key 不进入前端持久化配置，不以明文落库，不在响应中返回。
 
-离线 eval 的边界是输出合同回归，不声称真实模型评分准确率。它证明项目已经定义“什么样的 AI 反馈算可用”，并能在 CI 中阻止明显退化的反馈格式。
+离线 eval 的边界是输出合同回归，不声称真实模型评分准确率。它证明项目已经定义“什么样的 AI 反馈算可用”，并能在测试门禁中阻止明显退化的反馈格式。
 
 ## 内容治理
 
@@ -226,13 +228,12 @@ Push-Location backend; .\mvnw.cmd -q '-DskipTests' 'exec:java' '-Dexec.args=..\c
 (cd frontend && npm install)
 (cd frontend && npm run dev)
 (cd frontend && npm run lint)
-(cd frontend && npm run test)
 (cd frontend && npm run build)
 ```
 
-## 质量门禁和 CI
+## 质量门禁
 
-本地质量门禁：
+当前仓库以本地命令作为可复现质量门禁；尚未提交 GitHub Actions workflow。公开发布或启用 CI 时，应保持 CI 命令与本节一致，并且不得依赖真实 provider API key。
 
 ```powershell
 cd backend
@@ -240,16 +241,16 @@ cd backend
 
 cd ..\frontend
 npm run lint
-npm test
 npm run build
 ```
 
-GitHub Actions workflow 位于 `.github/workflows/ci.yml`，包含两个 secret-free job：
+```bash
+(cd backend && ./mvnw test)
+(cd frontend && npm run lint)
+(cd frontend && npm run build)
+```
 
-- **Backend tests**：Ubuntu runner + Java 21 + Maven wrapper + `./mvnw test`。这会同时运行 MockMvc contract tests、内容包测试和离线写作反馈 eval。
-- **Frontend checks**：Ubuntu runner + Node 20 + `npm ci` + `npm run lint` + `npm test` + `npm run build`。
-
-CI 不依赖真实 provider API key，不会访问 OpenAI-compatible 外部服务。
+上述命令不依赖真实 provider API key，不会访问 OpenAI-compatible 外部服务。
 
 ## 数据库
 
@@ -270,9 +271,13 @@ CI 不依赖真实 provider API key，不会访问 OpenAI-compatible 外部服�
 
 - 仓库只保留本文件作为唯一 `README.md` 入口，避免多个 README 内容分叉。
 - 后端依赖升级通过 `backend/pom.xml` 管理，升级后运行 `.\mvnw.cmd test` 或 `./mvnw test`。
-- API 合同需要保持与 `frontend/src/utils/apiClient.ts` 兼容，尤其是 `/api/v1/...` 路径、Bearer token、snake_case 字段和 `contentFormat` 字段。
+- API 合同需要保持与 `frontend/src/services/apiClient.ts` 兼容，尤其是 `/api/v1/...` 路径、Bearer token、snake_case 字段和 `contentFormat` 字段。
 - 新增公开学习内容前，先运行内容包校验，确认没有缺失来源声明、未知许可证、私有路径或旧内容痕迹。
 - 确需新增长期文档时再创建 `docs/`，并从本 README 链接；临时调研和阶段报告默认不入库。
+
+## 安全报告
+
+漏洞报告流程见 [SECURITY.md](SECURITY.md)。不要在公开 issue、讨论、截图或日志中粘贴真实 provider API key、JWT、数据库备份、用户数据或可复现攻击细节。
 
 ## 本地验收
 
@@ -284,4 +289,4 @@ CI 不依赖真实 provider API key，不会访问 OpenAI-compatible 外部服�
 6. 打开 `/app/history`，确认只看到当前账号的记录并可查看详情。
 7. 退出登录后再访问 `/app/writing`、`/app/history` 和 `/app/settings`，应回到登录流程。
 
-**最后更新**：2026-06-10
+**最后更新**：2026-06-16

@@ -92,14 +92,25 @@
 Run the validator before committing:
 
 ```powershell
-python backend/scripts/validate_content_packs.py
+cd backend
+.\mvnw.cmd -q '-DskipTests' 'exec:java' '-Dexec.args=..\content-samples'
+```
+
+```bash
+cd backend
+./mvnw -q -DskipTests exec:java -Dexec.args="../content-samples"
 ```
 
 Run focused tests when changing the validator:
 
 ```powershell
 cd backend
-pytest tests/test_content_pack_validator.py
+.\mvnw.cmd -Dtest=ContentPackValidatorTests test
+```
+
+```bash
+cd backend
+./mvnw -Dtest=ContentPackValidatorTests test
 ```
 
 ## Attribution
