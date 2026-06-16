@@ -86,20 +86,26 @@ function friendlyMessage(error: unknown, fallback: string): string {
 
 export interface RevisionHistoryProps {
   sectionKey: SectionKey;
-  isOpen: boolean;
-  onClose: () => void;
+  surface?: 'drawer' | 'page';
+  isOpen?: boolean;
+  onClose?: () => void;
   isAdmin: boolean;
+  revertEnabled?: boolean;
   /** Notify parent to re-fetch live sections after a revert. */
   onReverted?: () => void;
 }
 
 export function RevisionHistory({
   sectionKey,
-  isOpen,
+  surface = 'drawer',
+  isOpen = true,
   onClose,
   isAdmin,
+  revertEnabled = true,
   onReverted,
 }: RevisionHistoryProps) {
+  const isDrawer = surface === 'drawer';
+  const isActive = isDrawer ? isOpen : true;
   const sectionLabel = SECTION_LABELS[sectionKey];
 
   const [items, setItems] = useState<StudyRevisionSummary[]>([]);
@@ -166,8 +172,8 @@ export function RevisionHistory({
 
   // ----- Load snapshot on row select -----
   const selectRow = useCallback(
-    (id: number) => {
-      if (selectedId === id) return;
+    (id: number, forceReload = false) => {
+      if (!forceReload && selectedId === id) return;
       setSelectedId(id);
       setSnapshot(null);
       setSnapshotError(null);
@@ -193,6 +199,11 @@ export function RevisionHistory({
   // ----- Revert (admin) -----
   const handleRevert = useCallback(async () => {
     if (!revertTarget || isReverting) return;
+    if (!revertEnabled) {
+      showToast('当前策略已关闭内容回滚', 'warning');
+      setRevertTarget(null);
+      return;
+    }
     try {
       setIsReverting(true);
       await studyService.revert(sectionKey, {
@@ -211,44 +222,42 @@ export function RevisionHistory({
     } finally {
       setIsReverting(false);
     }
-  }, [revertTarget, isReverting, sectionKey, showToast, onReverted]);
+  }, [
+    revertTarget,
+    isReverting,
+    revertEnabled,
+    sectionKey,
+    showToast,
+    onReverted,
+  ]);
 
   // ----- Escape to close (overlay click also closes via onClose) -----
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isDrawer || !isOpen || !onClose) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !revertTarget) onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose, revertTarget]);
+  }, [isDrawer, isOpen, onClose, revertTarget]);
 
-  if (!isOpen) return null;
+  if (!isActive) return null;
 
-  return (
-    <div
-      className="fixed inset-0 z-40 flex items-stretch justify-end bg-ink/50 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="revision-history-title"
-    >
-      <div
-        className="bg-paper w-full max-w-5xl h-full overflow-y-auto shadow-[0_10px_30px_-12px_oklch(0.24_0.02_262/0.30)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 z-10 bg-paper/95 backdrop-blur-sm border-b border-line px-5 py-4 flex items-center justify-between gap-3">
-          <div>
-            <div className="text-[11px] font-semibold tracking-[0.02em] text-oxblood">
-              版本历史
-            </div>
-            <h2
-              id="revision-history-title"
-              className="mt-0.5 text-[18px] font-semibold tracking-tight text-ink"
-            >
-              {sectionLabel}
-            </h2>
+  const content = (
+    <>
+      <div className={`${isDrawer ? 'sticky top-0 z-10' : ''} bg-paper/95 backdrop-blur-sm border-b border-line px-5 py-4 flex items-center justify-between gap-3`}>
+        <div>
+          <div className="text-[11px] font-semibold tracking-[0.02em] text-oxblood">
+            版本历史
           </div>
+          <h2
+            id="revision-history-title"
+            className="mt-0.5 text-[18px] font-semibold tracking-tight text-ink"
+          >
+            {sectionLabel}
+          </h2>
+        </div>
+        {isDrawer && onClose && (
           <button
             type="button"
             onClick={onClose}
@@ -268,189 +277,219 @@ export function RevisionHistory({
               />
             </svg>
           </button>
-        </div>
+        )}
+      </div>
 
-        <div className="px-5 py-5 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
-          {/* ===== LIST ===== */}
-          <div>
-            {listPhase === 'loading' && (
-              <div aria-busy="true" aria-label="加载版本历史中">
-                <div className="rounded-lg border border-line bg-paper overflow-hidden divide-y divide-line">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-start gap-3 px-4 py-3.5">
-                      <Skeleton className="h-5 w-10 shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-2/3" />
-                        <Skeleton className="h-3 w-full" />
-                      </div>
+      <div className="px-5 py-5 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
+        {/* ===== LIST ===== */}
+        <div>
+          {listPhase === 'loading' && (
+            <div aria-busy="true" aria-label="加载版本历史中">
+              <div className="rounded-lg border border-line bg-paper overflow-hidden divide-y divide-line">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-start gap-3 px-4 py-3.5">
+                    <Skeleton className="h-5 w-10 shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-full" />
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {listPhase === 'error' && (
-              <div
-                role="alert"
-                className="rounded-lg border border-mark/30 bg-mark-soft/40 p-4"
-              >
-                <p className="text-[13px] text-mark leading-relaxed">{listError}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setReloadTick((t) => t + 1)}
-                >
-                  重试
-                </Button>
-              </div>
-            )}
-
-            {listPhase === 'ready' && items.length === 0 && (
-              <EmptyState
-                title="还没有版本记录"
-                description="该节的初始版本由系统写入；产生提案、直改或回滚后会出现在这里。"
-              />
-            )}
-
-            {listPhase === 'ready' && items.length > 0 && (
-              <ul className="rounded-lg border border-line bg-paper overflow-hidden divide-y divide-line">
-                {items.map((rev) => {
-                  const isActive = rev.id === selectedId;
-                  const fresh = isWithinDay(rev.created_at);
-                  const action = ACTION_LABELS[rev.action] ?? rev.action;
-                  const badge = STATUS_BADGE[rev.status] ?? {
-                    label: rev.status,
-                    className: 'border-line text-mute',
-                  };
-                  return (
-                    <li key={rev.id}>
-                      <button
-                        type="button"
-                        onClick={() => selectRow(rev.id)}
-                        aria-current={isActive ? 'true' : undefined}
-                        className={`w-full text-left flex items-start gap-3 px-4 py-3.5 transition-ui ${
-                          isActive ? 'bg-mark-soft/40' : 'hover:bg-panel/60'
-                        }`}
-                      >
-                        <Pin
-                          tone={fresh ? 'mark' : 'ok'}
-                          className="mt-0.5 shrink-0"
-                        >
-                          {formatRelativeTimeShort(rev.created_at)}
-                        </Pin>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[13px] font-medium text-ink">
-                              {action}
-                            </span>
-                            <span
-                              className={`text-[10.5px] font-mono px-1.5 py-0.5 rounded border bg-paper ${badge.className}`}
-                            >
-                              {badge.label}
-                            </span>
-                            <span className="text-[11.5px] text-mute truncate">
-                              {rev.author_username || '系统'}
-                            </span>
-                          </div>
-                          {rev.change_summary && (
-                            <p className="mt-1 text-[12px] text-mute leading-relaxed line-clamp-2">
-                              {rev.change_summary}
-                            </p>
-                          )}
-                          {rev.reviewer_username && (
-                            <p className="mt-0.5 text-[11px] font-mono text-mute">
-                              审核人 {rev.reviewer_username}
-                              {rev.review_note ? ` · ${rev.review_note}` : ''}
-                            </p>
-                          )}
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-
-          {/* ===== SNAPSHOT ===== */}
-          <div>
-            {selectedId === null && snapshotPhase !== 'loading' && (
-              <EmptyState
-                title="选择一个版本查看快照"
-                description="点击左侧任意版本，查看当时的完整内容。管理员可将其恢复为当前版本。"
-                className="min-h-[280px]"
-              />
-            )}
-
-            {snapshotPhase === 'loading' && (
-              <div
-                aria-busy="true"
-                aria-label="加载版本快照中"
-                className="rounded-lg border border-line bg-paper p-5 space-y-3"
-              >
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-3 w-24" />
-                <div className="pt-3 border-t border-line space-y-2">
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-3 w-5/6" />
-                  <Skeleton className="h-3 w-2/3" />
-                </div>
-              </div>
-            )}
-
-            {snapshotPhase === 'error' && (
-              <div
-                role="alert"
-                className="rounded-lg border border-mark/30 bg-mark-soft/40 p-4"
-              >
-                <p className="text-[13px] text-mark leading-relaxed">
-                  {snapshotError}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => selectedId !== null && selectRow(selectedId)}
-                >
-                  重试
-                </Button>
-              </div>
-            )}
-
-            {snapshotPhase === 'ready' && snapshot && (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-line bg-panel/60 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="text-[12px] text-mute leading-relaxed">
-                    <span className="font-mono text-ink">
-                      #{snapshot.id}
-                    </span>
-                    {' · '}
-                    {ACTION_LABELS[snapshot.action] ?? snapshot.action}
-                    {' · '}
-                    {snapshot.author_username || '系统'}
-                    {' · '}
-                    {new Date(snapshot.created_at).toLocaleString('zh-CN')}
                   </div>
-                  {isAdmin && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setRevertTarget(snapshot)}
-                    >
-                      恢复到此版本
-                    </Button>
-                  )}
-                </div>
-                <SectionView
-                  sectionKey={sectionKey}
-                  content={snapshot.content_json}
-                  hideHead
-                />
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {listPhase === 'error' && (
+            <div
+              role="alert"
+              className="rounded-lg border border-mark/30 bg-mark-soft/40 p-4"
+            >
+              <p className="text-[13px] text-mark leading-relaxed">{listError}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => setReloadTick((t) => t + 1)}
+              >
+                重试
+              </Button>
+            </div>
+          )}
+
+          {listPhase === 'ready' && items.length === 0 && (
+            <EmptyState
+              title="还没有版本记录"
+              description="该节的初始版本由系统写入；产生提案、直改或回滚后会出现在这里。"
+            />
+          )}
+
+          {listPhase === 'ready' && items.length > 0 && (
+            <ul className="rounded-lg border border-line bg-paper overflow-hidden divide-y divide-line">
+              {items.map((rev) => {
+                const isActiveRow = rev.id === selectedId;
+                const fresh = isWithinDay(rev.created_at);
+                const action = ACTION_LABELS[rev.action] ?? rev.action;
+                const badge = STATUS_BADGE[rev.status] ?? {
+                  label: rev.status,
+                  className: 'border-line text-mute',
+                };
+                return (
+                  <li key={rev.id}>
+                    <button
+                      type="button"
+                      onClick={() => selectRow(rev.id)}
+                      aria-current={isActiveRow ? 'true' : undefined}
+                      className={`w-full text-left flex items-start gap-3 px-4 py-3.5 transition-ui ${
+                        isActiveRow ? 'bg-mark-soft/40' : 'hover:bg-panel/60'
+                      }`}
+                    >
+                      <Pin
+                        tone={fresh ? 'mark' : 'ok'}
+                        className="mt-0.5 shrink-0"
+                      >
+                        {formatRelativeTimeShort(rev.created_at)}
+                      </Pin>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[13px] font-medium text-ink">
+                            {action}
+                          </span>
+                          <span
+                            className={`text-[10.5px] font-mono px-1.5 py-0.5 rounded border bg-paper ${badge.className}`}
+                          >
+                            {badge.label}
+                          </span>
+                          <span className="text-[11.5px] text-mute truncate">
+                            {rev.author_username || '系统'}
+                          </span>
+                        </div>
+                        {rev.change_summary && (
+                          <p className="mt-1 text-[12px] text-mute leading-relaxed line-clamp-2">
+                            {rev.change_summary}
+                          </p>
+                        )}
+                        {rev.reviewer_username && (
+                          <p className="mt-0.5 text-[11px] font-mono text-mute">
+                            审核人 {rev.reviewer_username}
+                            {rev.review_note ? ` · ${rev.review_note}` : ''}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
+
+        {/* ===== SNAPSHOT ===== */}
+        <div>
+          {selectedId === null && snapshotPhase !== 'loading' && (
+            <EmptyState
+              title="选择一个版本查看快照"
+              description="点击左侧任意版本，查看当时的完整内容。管理员可将其恢复为当前版本。"
+              className="min-h-[280px]"
+            />
+          )}
+
+          {snapshotPhase === 'loading' && (
+            <div
+              aria-busy="true"
+              aria-label="加载版本快照中"
+              className="rounded-lg border border-line bg-paper p-5 space-y-3"
+            >
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3 w-24" />
+              <div className="pt-3 border-t border-line space-y-2">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            </div>
+          )}
+
+          {snapshotPhase === 'error' && (
+            <div
+              role="alert"
+              className="rounded-lg border border-mark/30 bg-mark-soft/40 p-4"
+            >
+              <p className="text-[13px] text-mark leading-relaxed">
+                {snapshotError}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => selectedId !== null && selectRow(selectedId, true)}
+              >
+                重试
+              </Button>
+            </div>
+          )}
+
+          {snapshotPhase === 'ready' && snapshot && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-line bg-panel/60 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-[12px] text-mute leading-relaxed">
+                  <span className="font-mono text-ink">
+                    #{snapshot.id}
+                  </span>
+                  {' · '}
+                  {ACTION_LABELS[snapshot.action] ?? snapshot.action}
+                  {' · '}
+                  {snapshot.author_username || '系统'}
+                  {' · '}
+                  {new Date(snapshot.created_at).toLocaleString('zh-CN')}
+                </div>
+                {isAdmin && revertEnabled && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRevertTarget(snapshot)}
+                  >
+                    恢复到此版本
+                  </Button>
+                )}
+                {isAdmin && !revertEnabled && (
+                  <span className="text-[12px] text-mute">
+                    内容回滚已被策略关闭
+                  </span>
+                )}
+              </div>
+              <SectionView
+                sectionKey={sectionKey}
+                content={snapshot.content_json}
+                hideHead
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div
+      className={
+        isDrawer
+          ? 'fixed inset-0 z-40 flex items-stretch justify-end bg-ink/50 backdrop-blur-sm'
+          : 'rounded-lg border border-line bg-paper overflow-hidden'
+      }
+      onClick={isDrawer ? onClose : undefined}
+      role={isDrawer ? 'dialog' : 'region'}
+      aria-modal={isDrawer ? 'true' : undefined}
+      aria-labelledby="revision-history-title"
+    >
+      <div
+        className={
+          isDrawer
+            ? 'bg-paper w-full max-w-5xl h-full overflow-y-auto shadow-[0_10px_30px_-12px_oklch(0.24_0.02_262/0.30)]'
+            : 'w-full'
+        }
+        onClick={isDrawer ? (e) => e.stopPropagation() : undefined}
+      >
+        {content}
       </div>
 
       {/* Revert confirmation */}

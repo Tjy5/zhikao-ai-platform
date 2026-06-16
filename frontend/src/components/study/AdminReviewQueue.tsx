@@ -51,17 +51,26 @@ const INPUT_BASE =
   'placeholder:text-faint transition-ui border-line focus:border-ink focus:outline-none';
 
 export interface AdminReviewQueueProps {
-  isOpen: boolean;
-  onClose: () => void;
+  surface?: 'drawer' | 'page';
+  isOpen?: boolean;
+  onClose?: () => void;
   /** Notify parent to re-fetch live sections after approve. */
   onApproveApplied?: () => void;
+  /** Notify parent to refresh queue badges after approve/reject. */
+  onQueueChanged?: () => void;
+  rejectNoteRequired?: boolean;
 }
 
 export function AdminReviewQueue({
-  isOpen,
+  surface = 'drawer',
+  isOpen = true,
   onClose,
   onApproveApplied,
+  onQueueChanged,
+  rejectNoteRequired = false,
 }: AdminReviewQueueProps) {
+  const isDrawer = surface === 'drawer';
+  const isActive = isDrawer ? isOpen : true;
   const [items, setItems] = useState<StudyRevisionSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [listPhase, setListPhase] = useState<'loading' | 'ready' | 'error'>(
@@ -101,7 +110,7 @@ export function AdminReviewQueue({
 
   // ----- Load proposals -----
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isActive) return;
     let cancelled = false;
     const reqId = ++listReqIdRef.current;
     void (async () => {
@@ -122,12 +131,12 @@ export function AdminReviewQueue({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, reloadTick]);
+  }, [isActive, reloadTick]);
 
   // ----- Load snapshot -----
   const selectRow = useCallback(
-    (id: number) => {
-      if (selectedId === id) return;
+    (id: number, forceReload = false) => {
+      if (!forceReload && selectedId === id) return;
       setSelectedId(id);
       setSnapshot(null);
       setSnapshotError(null);
@@ -157,6 +166,7 @@ export function AdminReviewQueue({
       await studyService.approve(snapshot.id);
       showToast(`已通过「${SECTION_LABELS[snapshot.section_key]}」的提案`, 'success');
       onApproveApplied?.();
+      onQueueChanged?.();
       setSelectedId(null);
       setSnapshot(null);
       setSnapshotPhase('idle');
@@ -166,7 +176,7 @@ export function AdminReviewQueue({
     } finally {
       setActing(false);
     }
-  }, [snapshot, acting, showToast, onApproveApplied]);
+  }, [snapshot, acting, showToast, onApproveApplied, onQueueChanged]);
 
   // ----- Reject (with note) -----
   const openReject = useCallback(() => {
@@ -177,6 +187,10 @@ export function AdminReviewQueue({
 
   const handleRejectConfirm = useCallback(async () => {
     if (!rejectTarget || acting) return;
+    if (rejectNoteRequired && !rejectNote.trim()) {
+      showToast('请填写驳回理由', 'error');
+      return;
+    }
     try {
       setActing(true);
       await studyService.reject(rejectTarget.id, {
@@ -191,49 +205,49 @@ export function AdminReviewQueue({
         setSnapshotPhase('idle');
       }
       setReloadTick((t) => t + 1);
+      onQueueChanged?.();
     } catch (err) {
       showToast(studyWriteMessage(err, '驳回提案失败'), 'error');
     } finally {
       setActing(false);
     }
-  }, [rejectTarget, acting, rejectNote, showToast, selectedId]);
+  }, [
+    rejectTarget,
+    acting,
+    rejectNote,
+    rejectNoteRequired,
+    showToast,
+    selectedId,
+    onQueueChanged,
+  ]);
 
   // ----- Escape to close -----
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isDrawer || !isOpen || !onClose) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !rejectTarget) onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose, rejectTarget]);
+  }, [isDrawer, isOpen, onClose, rejectTarget]);
 
-  if (!isOpen) return null;
+  if (!isActive) return null;
 
-  return (
-    <div
-      className="fixed inset-0 z-40 flex items-stretch justify-end bg-ink/50 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="admin-review-title"
-    >
-      <div
-        className="bg-paper w-full max-w-5xl h-full overflow-y-auto shadow-[0_10px_30px_-12px_oklch(0.24_0.02_262/0.30)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 z-10 bg-paper/95 backdrop-blur-sm border-b border-line px-5 py-4 flex items-center justify-between gap-3">
-          <div>
-            <div className="text-[11px] font-semibold tracking-[0.02em] text-oxblood">
-              审核队列
-            </div>
-            <h2
-              id="admin-review-title"
-              className="mt-0.5 text-[18px] font-semibold tracking-tight text-ink"
-            >
-              待审核的修改提案{total > 0 ? `（${total}）` : ''}
-            </h2>
+  const content = (
+    <>
+      <div className={`${isDrawer ? 'sticky top-0 z-10' : ''} bg-paper/95 backdrop-blur-sm border-b border-line px-5 py-4 flex items-center justify-between gap-3`}>
+        <div>
+          <div className="text-[11px] font-semibold tracking-[0.02em] text-oxblood">
+            审核队列
           </div>
+          <h2
+            id="admin-review-title"
+            className="mt-0.5 text-[18px] font-semibold tracking-tight text-ink"
+          >
+            待审核的修改提案{total > 0 ? `（${total}）` : ''}
+          </h2>
+        </div>
+        {isDrawer && onClose && (
           <button
             type="button"
             onClick={onClose}
@@ -253,193 +267,218 @@ export function AdminReviewQueue({
               />
             </svg>
           </button>
-        </div>
+        )}
+      </div>
 
-        <div className="px-5 py-5 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
-          {/* ===== LIST ===== */}
-          <div>
-            {listPhase === 'loading' && (
-              <div aria-busy="true" aria-label="加载审核队列中">
-                <div className="rounded-lg border border-line bg-paper overflow-hidden divide-y divide-line">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="flex items-start gap-3 px-4 py-3.5">
-                      <Skeleton className="h-5 w-10 shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-2/3" />
-                        <Skeleton className="h-3 w-full" />
-                      </div>
+      <div className="px-5 py-5 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
+        {/* ===== LIST ===== */}
+        <div>
+          {listPhase === 'loading' && (
+            <div aria-busy="true" aria-label="加载审核队列中">
+              <div className="rounded-lg border border-line bg-paper overflow-hidden divide-y divide-line">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-start gap-3 px-4 py-3.5">
+                    <Skeleton className="h-5 w-10 shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-full" />
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {listPhase === 'error' && (
-              <div
-                role="alert"
-                className="rounded-lg border border-mark/30 bg-mark-soft/40 p-4"
+          {listPhase === 'error' && (
+            <div
+              role="alert"
+              className="rounded-lg border border-mark/30 bg-mark-soft/40 p-4"
+            >
+              <p className="text-[13px] text-mark leading-relaxed">{listError}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => setReloadTick((t) => t + 1)}
               >
-                <p className="text-[13px] text-mark leading-relaxed">{listError}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setReloadTick((t) => t + 1)}
-                >
-                  重试
-                </Button>
-              </div>
-            )}
+                重试
+              </Button>
+            </div>
+          )}
 
-            {listPhase === 'ready' && items.length === 0 && (
-              <EmptyState
-                title="没有待审核的提案"
-                description="用户提交的修改建议会出现在这里；通过后即时生效，驳回（含理由）不生效。"
-              />
-            )}
+          {listPhase === 'ready' && items.length === 0 && (
+            <EmptyState
+              title="没有待审核的提案"
+              description="用户提交的修改建议会出现在这里；通过后即时生效，驳回（含理由）不生效。"
+            />
+          )}
 
-            {listPhase === 'ready' && items.length > 0 && (
-              <ul className="rounded-lg border border-line bg-paper overflow-hidden divide-y divide-line">
-                {items.map((rev) => {
-                  const isActive = rev.id === selectedId;
-                  const fresh = isWithinDay(rev.created_at);
-                  const label =
-                    SECTION_LABELS[rev.section_key as SectionKey] ?? rev.section_key;
-                  return (
-                    <li key={rev.id}>
-                      <button
-                        type="button"
-                        onClick={() => selectRow(rev.id)}
-                        aria-current={isActive ? 'true' : undefined}
-                        className={`w-full text-left flex items-start gap-3 px-4 py-3.5 transition-ui ${
-                          isActive ? 'bg-mark-soft/40' : 'hover:bg-panel/60'
-                        }`}
+          {listPhase === 'ready' && items.length > 0 && (
+            <ul className="rounded-lg border border-line bg-paper overflow-hidden divide-y divide-line">
+              {items.map((rev) => {
+                const isActiveRow = rev.id === selectedId;
+                const fresh = isWithinDay(rev.created_at);
+                const label =
+                  SECTION_LABELS[rev.section_key as SectionKey] ?? rev.section_key;
+                return (
+                  <li key={rev.id}>
+                    <button
+                      type="button"
+                      onClick={() => selectRow(rev.id)}
+                      aria-current={isActiveRow ? 'true' : undefined}
+                      className={`w-full text-left flex items-start gap-3 px-4 py-3.5 transition-ui ${
+                        isActiveRow ? 'bg-mark-soft/40' : 'hover:bg-panel/60'
+                      }`}
+                    >
+                      <Pin
+                        tone={fresh ? 'mark' : 'ok'}
+                        className="mt-0.5 shrink-0"
                       >
-                        <Pin
-                          tone={fresh ? 'mark' : 'ok'}
-                          className="mt-0.5 shrink-0"
-                        >
-                          {formatRelativeTimeShort(rev.created_at)}
-                        </Pin>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[13px] font-medium text-ink">
-                              {label}
-                            </span>
-                            <span className="text-[11.5px] text-mute truncate">
-                              {rev.author_username || '匿名'}
-                            </span>
-                          </div>
-                          {rev.change_summary && (
-                            <p className="mt-1 text-[12px] text-mute leading-relaxed line-clamp-2">
-                              {rev.change_summary}
-                            </p>
-                          )}
+                        {formatRelativeTimeShort(rev.created_at)}
+                      </Pin>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[13px] font-medium text-ink">
+                            {label}
+                          </span>
+                          <span className="text-[11.5px] text-mute truncate">
+                            {rev.author_username || '匿名'}
+                          </span>
                         </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-
-          {/* ===== SNAPSHOT + ACTIONS ===== */}
-          <div>
-            {selectedId === null && snapshotPhase !== 'loading' && (
-              <EmptyState
-                title="选择一条提案查看内容"
-                description="查看提案的完整内容快照，决定通过（即时生效）或驳回（填写理由，不生效）。"
-                className="min-h-[280px]"
-              />
-            )}
-
-            {snapshotPhase === 'loading' && (
-              <div
-                aria-busy="true"
-                aria-label="加载提案快照中"
-                className="rounded-lg border border-line bg-paper p-5 space-y-3"
-              >
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-3 w-24" />
-                <div className="pt-3 border-t border-line space-y-2">
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-3 w-5/6" />
-                  <Skeleton className="h-3 w-2/3" />
-                </div>
-              </div>
-            )}
-
-            {snapshotPhase === 'error' && (
-              <div
-                role="alert"
-                className="rounded-lg border border-mark/30 bg-mark-soft/40 p-4"
-              >
-                <p className="text-[13px] text-mark leading-relaxed">
-                  {snapshotError}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => selectedId !== null && selectRow(selectedId)}
-                >
-                  重试
-                </Button>
-              </div>
-            )}
-
-            {snapshotPhase === 'ready' && snapshot && (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-line bg-panel/60 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="text-[12px] text-mute leading-relaxed">
-                    <span className="font-medium text-ink">
-                      {SECTION_LABELS[snapshot.section_key as SectionKey] ??
-                        snapshot.section_key}
-                    </span>
-                    {' · '}
-                    {snapshot.author_username || '匿名'}
-                    {' · '}
-                    {new Date(snapshot.created_at).toLocaleString('zh-CN')}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={openReject}
-                      disabled={acting}
-                    >
-                      驳回
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={handleApprove}
-                      isLoading={acting}
-                    >
-                      通过
-                    </Button>
-                  </div>
-                </div>
-                {snapshot.change_summary && (
-                  <div className="rounded-md border border-line bg-paper px-3.5 py-2.5">
-                    <div className="text-[11px] font-semibold tracking-[0.02em] text-mute">
-                      变更摘要
-                    </div>
-                    <p className="mt-1 text-[13px] text-ink leading-relaxed">
-                      {snapshot.change_summary}
-                    </p>
-                  </div>
-                )}
-                <SectionView
-                  sectionKey={snapshot.section_key as SectionKey}
-                  content={snapshot.content_json}
-                  hideHead
-                />
-              </div>
-            )}
-          </div>
+                        {rev.change_summary && (
+                          <p className="mt-1 text-[12px] text-mute leading-relaxed line-clamp-2">
+                            {rev.change_summary}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
+
+        {/* ===== SNAPSHOT + ACTIONS ===== */}
+        <div>
+          {selectedId === null && snapshotPhase !== 'loading' && (
+            <EmptyState
+              title="选择一条提案查看内容"
+              description="查看提案的完整内容快照，决定通过（即时生效）或驳回（填写理由，不生效）。"
+              className="min-h-[280px]"
+            />
+          )}
+
+          {snapshotPhase === 'loading' && (
+            <div
+              aria-busy="true"
+              aria-label="加载提案快照中"
+              className="rounded-lg border border-line bg-paper p-5 space-y-3"
+            >
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3 w-24" />
+              <div className="pt-3 border-t border-line space-y-2">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            </div>
+          )}
+
+          {snapshotPhase === 'error' && (
+            <div
+              role="alert"
+              className="rounded-lg border border-mark/30 bg-mark-soft/40 p-4"
+            >
+              <p className="text-[13px] text-mark leading-relaxed">
+                {snapshotError}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => selectedId !== null && selectRow(selectedId, true)}
+              >
+                重试
+              </Button>
+            </div>
+          )}
+
+          {snapshotPhase === 'ready' && snapshot && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-line bg-panel/60 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-[12px] text-mute leading-relaxed">
+                  <span className="font-medium text-ink">
+                    {SECTION_LABELS[snapshot.section_key as SectionKey] ??
+                      snapshot.section_key}
+                  </span>
+                  {' · '}
+                  {snapshot.author_username || '匿名'}
+                  {' · '}
+                  {new Date(snapshot.created_at).toLocaleString('zh-CN')}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openReject}
+                    disabled={acting}
+                  >
+                    驳回
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleApprove}
+                    isLoading={acting}
+                  >
+                    通过
+                  </Button>
+                </div>
+              </div>
+              {snapshot.change_summary && (
+                <div className="rounded-md border border-line bg-paper px-3.5 py-2.5">
+                  <div className="text-[11px] font-semibold tracking-[0.02em] text-mute">
+                    变更摘要
+                  </div>
+                  <p className="mt-1 text-[13px] text-ink leading-relaxed">
+                    {snapshot.change_summary}
+                  </p>
+                </div>
+              )}
+              <SectionView
+                sectionKey={snapshot.section_key as SectionKey}
+                content={snapshot.content_json}
+                hideHead
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div
+      className={
+        isDrawer
+          ? 'fixed inset-0 z-40 flex items-stretch justify-end bg-ink/50 backdrop-blur-sm'
+          : 'rounded-lg border border-line bg-paper overflow-hidden'
+      }
+      onClick={isDrawer ? onClose : undefined}
+      role={isDrawer ? 'dialog' : 'region'}
+      aria-modal={isDrawer ? 'true' : undefined}
+      aria-labelledby="admin-review-title"
+    >
+      <div
+        className={
+          isDrawer
+            ? 'bg-paper w-full max-w-5xl h-full overflow-y-auto shadow-[0_10px_30px_-12px_oklch(0.24_0.02_262/0.30)]'
+            : 'w-full'
+        }
+        onClick={isDrawer ? (e) => e.stopPropagation() : undefined}
+      >
+        {content}
       </div>
 
       {/* Reject note dialog */}
@@ -459,11 +498,14 @@ export function AdminReviewQueue({
               驳回这条提案
             </h3>
             <p className="mt-2 text-[13px] text-mute leading-relaxed">
-              驳回后该提案不会生效。填写理由可以帮助提交者改进（可选）。
+              驳回后该提案不会生效。
+              {rejectNoteRequired
+                ? '当前策略要求必须填写驳回理由。'
+                : '填写理由可以帮助提交者改进（可选）。'}
             </p>
             <label className="block mt-4">
               <span className="block text-[12px] font-medium text-mute mb-1">
-                驳回理由（可选）
+                驳回理由{rejectNoteRequired ? '（必填）' : '（可选）'}
               </span>
               <textarea
                 value={rejectNote}
@@ -487,6 +529,7 @@ export function AdminReviewQueue({
                 size="sm"
                 onClick={handleRejectConfirm}
                 isLoading={acting}
+                disabled={rejectNoteRequired && !rejectNote.trim()}
               >
                 确认驳回
               </Button>
