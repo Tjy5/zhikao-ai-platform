@@ -123,6 +123,42 @@ export interface AdminSettingsUpdate {
   operation_policy: OperationPolicySettings;
 }
 
+// Admin user management
+export type AdminUserRole = 'user' | 'admin';
+
+export interface AdminUserSummary {
+  id: number;
+  username: string;
+  email: string;
+  is_active: boolean;
+  role: AdminUserRole;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminUserListResponse {
+  users: AdminUserSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AdminUserListParams {
+  q?: string;
+  role?: AdminUserRole;
+  active?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AdminUserRoleUpdate {
+  role: AdminUserRole;
+}
+
+export interface AdminUserActiveUpdate {
+  is_active: boolean;
+}
+
 // Writing types
 export interface WritingSubmission {
   content: string;

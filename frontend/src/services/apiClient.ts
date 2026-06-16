@@ -158,6 +158,10 @@ class ApiClient {
     return this.request<T>('PUT', path, body, options);
   }
 
+  patch<T>(path: string, body?: unknown, options?: RequestInit): Promise<T> {
+    return this.request<T>('PATCH', path, body, options);
+  }
+
   delete<T>(path: string, options?: RequestInit): Promise<T> {
     return this.request<T>('DELETE', path, undefined, options);
   }

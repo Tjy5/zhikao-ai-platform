@@ -85,6 +85,61 @@ public class UserRepository {
         .update();
   }
 
+  public int updateActive(long userId, boolean active) {
+    return jdbc.sql("update users set is_active = :active, updated_at = :now where id = :id")
+        .param("active", active ? 1 : 0)
+        .param("now", clock.now().toString())
+        .param("id", userId)
+        .update();
+  }
+
+  public List<UserRecord> listForAdmin(String q, String role, Boolean active, int limit, int offset) {
+    QueryParts parts = queryParts(q, role, active);
+    return jdbc.sql(
+            "select * from users "
+                + parts.where()
+                + " order by datetime(created_at) desc, id desc limit :limit offset :offset")
+        .params(parts.params())
+        .param("limit", limit)
+        .param("offset", offset)
+        .query(UserRepository::map)
+        .list();
+  }
+
+  public int countForAdmin(String q, String role, Boolean active) {
+    QueryParts parts = queryParts(q, role, active);
+    Integer count =
+        jdbc.sql("select count(*) from users " + parts.where())
+            .params(parts.params())
+            .query(Integer.class)
+            .single();
+    return count == null ? 0 : count;
+  }
+
+  public boolean isAllowedRole(String role) {
+    return ALLOWED_ROLES.contains(role);
+  }
+
+  private static QueryParts queryParts(String q, String role, Boolean active) {
+    StringBuilder where = new StringBuilder("where 1 = 1");
+    java.util.Map<String, Object> params = new java.util.HashMap<>();
+    if (q != null && !q.isBlank()) {
+      where.append(" and (lower(username) like :q or lower(email) like :q)");
+      params.put("q", "%" + q.trim().toLowerCase() + "%");
+    }
+    if (role != null && !role.isBlank()) {
+      where.append(" and role = :role");
+      params.put("role", role);
+    }
+    if (active != null) {
+      where.append(" and is_active = :active");
+      params.put("active", active ? 1 : 0);
+    }
+    return new QueryParts(where.toString(), params);
+  }
+
+  private record QueryParts(String where, java.util.Map<String, Object> params) {}
+
   private static UserRecord map(ResultSet rs, int rowNum) throws SQLException {
     return new UserRecord(
         rs.getLong("id"),
