@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
@@ -238,6 +238,13 @@ export default function StudyPage() {
 
   // Mobile drawer open state (design.md §2.2). Desktop rail is always visible.
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const drawerPanelRef = useRef<HTMLDivElement | null>(null);
+  const [manualPoint, setManualPoint] = useState<{
+    key: SectionKey;
+    index: number;
+  } | null>(null);
+  const manualPointResetRef = useRef<number | null>(null);
 
   // Toast.
   const [toast, setToast] = useState<{
@@ -338,20 +345,43 @@ export default function StudyPage() {
   // Scroll-spy runs only for the focused reader (ready|fallback), never on a
   // loading skeleton or while the drawer is mid-open.
   const spyEnabled = phase === 'ready' || phase === 'fallback';
-  const activePoint = useScrollSpy(pointIds, spyEnabled);
+  const spyPoint = useScrollSpy(pointIds, spyEnabled);
+  const manualActivePoint =
+    manualPoint?.key === activeKey && manualPoint.index < points.length
+      ? manualPoint.index
+      : null;
+  const activePoint =
+    manualActivePoint ?? spyPoint;
 
   // Scroll a selected knowledge point into view + give immediate rail feedback
   // (the spy re-affirms on scroll settle). Closes the mobile drawer.
   const selectPoint = useCallback(
     (i: number) => {
+      if (!activeKey) return;
       const el = document.getElementById(pointIdFor(ANCHOR_PREFIX, i));
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+      setManualPoint({ key: activeKey, index: i });
+      if (manualPointResetRef.current !== null) {
+        window.clearTimeout(manualPointResetRef.current);
+      }
+      manualPointResetRef.current = window.setTimeout(() => {
+        setManualPoint(null);
+        manualPointResetRef.current = null;
+      }, 1200);
       setDrawerOpen(false);
     },
-    []
+    [activeKey]
   );
+
+  useEffect(() => {
+    return () => {
+      if (manualPointResetRef.current !== null) {
+        window.clearTimeout(manualPointResetRef.current);
+      }
+    };
+  }, []);
 
   // Prev / next module for the pager (design.md §9).
   const activeIndex = activeKey
@@ -364,15 +394,23 @@ export default function StudyPage() {
       ? SECTION_ORDER[activeIndex + 1]
       : null;
 
-  // Close the mobile drawer on Escape (focus moves back to the trigger via the
-  // drawer's own focus handling on close; here we just unmount it).
+  // Mobile drawer focus: move focus into the dialog while open, close on Escape,
+  // and return focus to the trigger on close.
   useEffect(() => {
     if (!drawerOpen) return;
+    const trigger = drawerTriggerRef.current;
+    const frame = window.requestAnimationFrame(() => {
+      drawerPanelRef.current?.focus();
+    });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setDrawerOpen(false);
     };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', onKey);
+      trigger?.focus();
+    };
   }, [drawerOpen]);
 
   // ----- Route guard: unknown / missing :sectionKey → overview module. This
@@ -520,6 +558,7 @@ export default function StudyPage() {
               label so the reader always knows where they are. */}
           <div className="lg:hidden -mx-4 px-4 sticky top-14 z-10 bg-paper/95 backdrop-blur-sm border-b border-line py-2.5 flex items-center justify-between gap-3">
             <button
+              ref={drawerTriggerRef}
               type="button"
               onClick={() => setDrawerOpen(true)}
               aria-expanded={drawerOpen}
@@ -613,15 +652,14 @@ export default function StudyPage() {
         <div
           className="lg:hidden fixed inset-0 z-40 bg-ink/50 backdrop-blur-sm"
           onClick={() => setDrawerOpen(false)}
-          role="button"
-          aria-label="关闭模块导航"
-          tabIndex={-1}
         >
           <div
+            ref={drawerPanelRef}
             id="study-nav-drawer"
             role="dialog"
             aria-modal="true"
             aria-label="申论学习模块导航"
+            tabIndex={-1}
             className="absolute left-0 top-0 h-full w-[80%] max-w-[20rem] bg-paper shadow-[0_10px_30px_-12px_oklch(0.24_0.02_262/0.30)] overflow-y-auto p-4"
             onClick={(e) => e.stopPropagation()}
           >
