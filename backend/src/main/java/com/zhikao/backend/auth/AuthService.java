@@ -8,6 +8,7 @@ import com.zhikao.backend.common.Clock;
 import com.zhikao.backend.data.UserRecord;
 import com.zhikao.backend.data.UserRepository;
 import com.zhikao.backend.security.JwtService;
+import com.zhikao.backend.settings.PlatformSettingsService;
 import java.time.Instant;
 import java.util.Locale;
 import org.springframework.http.HttpStatus;
@@ -22,21 +23,25 @@ public class AuthService {
   private final UserRepository users;
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
+  private final PlatformSettingsService platformSettingsService;
   private final Clock clock;
 
   public AuthService(
       UserRepository users,
       PasswordEncoder passwordEncoder,
       JwtService jwtService,
+      PlatformSettingsService platformSettingsService,
       Clock clock) {
     this.users = users;
     this.passwordEncoder = passwordEncoder;
     this.jwtService = jwtService;
+    this.platformSettingsService = platformSettingsService;
     this.clock = clock;
   }
 
   @Transactional
   public UserResponse register(RegisterRequest request) {
+    platformSettingsService.requirePublicRegistrationEnabled();
     String username = normalizeUsername(request.username());
     String email = normalizeEmail(request.email());
     if (users.existsByUsernameOrEmail(username, email)) {

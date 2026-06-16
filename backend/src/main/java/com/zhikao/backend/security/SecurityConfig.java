@@ -44,13 +44,20 @@ public class SecurityConfig {
         .exceptionHandling(
             exceptions ->
                 exceptions.authenticationEntryPoint(
-                    (request, response, authException) -> {
-                      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                      response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                      response.setCharacterEncoding("UTF-8");
-                      objectMapper.writeValue(
-                          response.getWriter(), Map.of("detail", "无法验证当前用户"));
-                    }))
+                        (request, response, authException) -> {
+                          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                          response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                          response.setCharacterEncoding("UTF-8");
+                          objectMapper.writeValue(
+                              response.getWriter(), Map.of("detail", "无法验证当前用户"));
+                        })
+                    .accessDeniedHandler(
+                        (request, response, accessDeniedException) -> {
+                          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                          response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                          response.setCharacterEncoding("UTF-8");
+                          objectMapper.writeValue(response.getWriter(), Map.of("detail", "权限不足"));
+                        }))
         .authorizeHttpRequests(
             requests ->
                 requests
@@ -60,6 +67,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login")
                     .permitAll()
+                    .requestMatchers("/api/v1/admin/**")
+                    .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

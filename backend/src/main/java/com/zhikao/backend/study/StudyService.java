@@ -7,6 +7,7 @@ import com.zhikao.backend.common.Clock;
 import com.zhikao.backend.data.UserRecord;
 import com.zhikao.backend.data.UserRepository;
 import com.zhikao.backend.security.CurrentUser;
+import com.zhikao.backend.settings.PlatformSettingsService;
 import com.zhikao.backend.study.StudyDtos.EditRequest;
 import com.zhikao.backend.study.StudyDtos.ProposeRequest;
 import com.zhikao.backend.study.StudyDtos.ProposalsResponse;
@@ -41,6 +42,7 @@ public class StudyService {
   private final StudyRevisionRepository revisions;
   private final UserRepository users;
   private final ObjectMapper mapper;
+  private final PlatformSettingsService platformSettingsService;
   private final Clock clock;
 
   public StudyService(
@@ -48,11 +50,13 @@ public class StudyService {
       StudyRevisionRepository revisions,
       UserRepository users,
       ObjectMapper mapper,
+      PlatformSettingsService platformSettingsService,
       Clock clock) {
     this.sections = sections;
     this.revisions = revisions;
     this.users = users;
     this.mapper = mapper;
+    this.platformSettingsService = platformSettingsService;
     this.clock = clock;
   }
 
@@ -113,6 +117,7 @@ public class StudyService {
   @Transactional
   public RevisionSummary propose(
       String key, CurrentUser author, ProposeRequest request) {
+    platformSettingsService.requireContentProposalsEnabled();
     String content = validateAndStore(key, request.contentJson());
     ensureSection(key);
     Instant now = clock.now();
@@ -140,6 +145,7 @@ public class StudyService {
   /** admin → new {@code published/direct_edit}; old published → superseded; pointer updated. */
   @Transactional
   public RevisionDetail edit(String key, CurrentUser admin, EditRequest request) {
+    platformSettingsService.requireAdminDirectPublishEnabled();
     String content = validateAndStore(key, request.contentJson());
     ensureSection(key);
     Instant now = clock.now();
@@ -198,6 +204,7 @@ public class StudyService {
   /** admin → reject a proposal: same row flows to {@code rejected} with note + reviewer. */
   @Transactional
   public RejectResponse reject(long revisionId, CurrentUser admin, String note) {
+    platformSettingsService.requireRejectNotePolicy(note);
     StudyRevisionRecord proposal = requireRevision(revisionId);
     requireState(proposal, "proposed");
     revisions.reject(proposal.id(), admin.id(), clock.now(), note);
@@ -210,6 +217,7 @@ public class StudyService {
    */
   @Transactional
   public RevisionDetail revert(String key, CurrentUser admin, long targetRevisionId) {
+    platformSettingsService.requireContentRevertEnabled();
     StudySectionShape.forKey(key);
     StudyRevisionRecord target = requireRevision(targetRevisionId);
     if (!target.sectionKey().equals(key)) {

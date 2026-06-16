@@ -28,6 +28,7 @@ public class SettingsService {
   private final UserAiSettingsRepository settings;
   private final ApiKeyEncryptionService encryption;
   private final AppProperties properties;
+  private final PlatformSettingsService platformSettingsService;
   private final Clock clock;
   private final AiProvider aiProvider;
 
@@ -35,17 +36,22 @@ public class SettingsService {
       UserAiSettingsRepository settings,
       ApiKeyEncryptionService encryption,
       AppProperties properties,
+      PlatformSettingsService platformSettingsService,
       Clock clock,
       AiProvider aiProvider) {
     this.settings = settings;
     this.encryption = encryption;
     this.properties = properties;
+    this.platformSettingsService = platformSettingsService;
     this.clock = clock;
     this.aiProvider = aiProvider;
   }
 
   public WritingAISettingsResponse get(long userId) {
-    return settings.findByUserId(userId).map(this::toResponse).orElse(defaultResponse());
+    return settings
+        .findByUserId(userId)
+        .map(this::toResponse)
+        .orElseGet(() -> platformSettingsService.toWritingResponse(platformSettingsService.current()));
   }
 
   @Transactional
@@ -71,16 +77,19 @@ public class SettingsService {
 
   public ProviderModelsResponse discoverModels(long userId, WritingAIModelDiscoveryRequest request) {
     UserAiSettingsRecord saved = settings.findByUserId(userId).orElse(null);
+    var global = saved == null ? platformSettingsService.current() : null;
     String baseUrl =
         normalizeBaseUrl(
             firstText(
                 request == null ? null : request.baseUrl(),
                 saved == null ? null : saved.baseUrl(),
+                global == null ? null : global.writingBaseUrl(),
                 properties.openaiApiBase()));
     String apiKey =
         firstText(
             request == null ? null : request.apiKey(),
-            saved == null ? null : decrypt(saved.apiKeyEncrypted()));
+            saved == null ? null : decrypt(saved.apiKeyEncrypted()),
+            global == null ? null : decrypt(global.writingApiKeyEncrypted()));
     if (apiKey == null || apiKey.isBlank()) {
       return new ProviderModelsResponse(
           "unavailable", false, baseUrl, 0, List.of(), "unavailable", "Provider API key is not configured");
@@ -91,8 +100,8 @@ public class SettingsService {
               new AiProviderConfig(
                   apiKey,
                   baseUrl,
-                  saved == null ? properties.openaiModelName() : saved.modelName(),
-                  saved == null ? properties.writingLlmJsonFallback() : saved.jsonFallbackEnabled()))
+                  saved == null ? global.writingModelName() : saved.modelName(),
+                  saved == null ? global.writingJsonFallbackEnabled() : saved.jsonFallbackEnabled()))
               .stream()
               .sorted(Comparator.comparing(ProviderModelInfo::id))
               .toList();
@@ -112,37 +121,43 @@ public class SettingsService {
 
   @Transactional
   public ProviderTestResponse testProvider(long userId) {
-    UserAiSettingsRecord row = settings.findByUserId(userId).orElse(null);
-    if (row == null || row.apiKeyEncrypted() == null || row.apiKeyEncrypted().isBlank()) {
+    EffectiveAiSettings effective;
+    try {
+      effective = requireEffectiveSettings(userId);
+    } catch (AiProviderException error) {
       return new ProviderTestResponse(
-          "unavailable", false, row == null ? null : row.modelName(), row == null ? null : row.baseUrl(), null, "unavailable", "Provider API key is not configured");
+          "unavailable", false, null, null, null, "unavailable", "Provider API key is not configured");
     }
-    String apiKey = decrypt(row.apiKeyEncrypted());
     Instant now = clock.now();
     try {
       aiProvider.gradeWritingRaw(
-          new AiProviderConfig(apiKey, row.baseUrl(), row.modelName(), row.jsonFallbackEnabled()),
+          effective.config(),
           "请用一句话回复 Markdown 批改能力正常。",
           "provider_test");
-      settings.updateProviderStatus(row.id(), "succeeded", now, null, "raw_text");
+      recordSuccess(effective, now);
       return new ProviderTestResponse(
-          "succeeded", true, row.modelName(), row.baseUrl(), "raw_text", null, "Provider 测试成功");
+          "succeeded",
+          true,
+          effective.config().modelName(),
+          effective.config().baseUrl(),
+          "raw_text",
+          null,
+          "Provider 测试成功");
     } catch (AiProviderException error) {
-      settings.updateProviderStatus(row.id(), "failed", now, error.classification().value(), null);
+      recordFailure(effective, now, error.classification());
       return new ProviderTestResponse(
           error.classification() == AiClassification.UNAVAILABLE ? "unavailable" : "failed",
           true,
-          row.modelName(),
-          row.baseUrl(),
+          effective.config().modelName(),
+          effective.config().baseUrl(),
           null,
           error.classification().value(),
           error.classification().userMessage());
     }
   }
 
-  public AiProviderConfig providerConfig(UserAiSettingsRecord row) {
-    return new AiProviderConfig(
-        decrypt(row.apiKeyEncrypted()), row.baseUrl(), row.modelName(), row.jsonFallbackEnabled());
+  public AiProviderConfig providerConfig(EffectiveAiSettings effective) {
+    return effective.config();
   }
 
   public String decrypt(String encrypted) {
@@ -171,35 +186,35 @@ public class SettingsService {
         row.lastSuccessfulMode());
   }
 
-  private WritingAISettingsResponse defaultResponse() {
-    return new WritingAISettingsResponse(
-        null,
-        "openai-compatible",
-        properties.openaiApiBase(),
-        properties.openaiModelName(),
-        properties.writingLlmJsonFallback(),
-        false,
-        null,
-        null,
-        null,
-        null,
-        null);
-  }
-
-  public UserAiSettingsRecord requireConfiguredSettings(long userId) {
+  public EffectiveAiSettings requireEffectiveSettings(long userId) {
     UserAiSettingsRecord row = settings.findByUserId(userId).orElse(null);
-    if (row == null || row.apiKeyEncrypted() == null || row.apiKeyEncrypted().isBlank()) {
-      throw new AiProviderException(AiClassification.UNAVAILABLE, "user provider api key missing");
+    if (row != null) {
+      if (row.apiKeyEncrypted() == null || row.apiKeyEncrypted().isBlank()) {
+        throw new AiProviderException(AiClassification.UNAVAILABLE, "user provider api key missing");
+      }
+      return new EffectiveAiSettings(
+          "user",
+          row.id(),
+          new AiProviderConfig(
+              decrypt(row.apiKeyEncrypted()), row.baseUrl(), row.modelName(), row.jsonFallbackEnabled()));
     }
-    return row;
+    return platformSettingsService.requireConfiguredGlobalSettings();
   }
 
-  public void recordSuccess(UserAiSettingsRecord row, Instant now) {
-    settings.updateProviderStatus(row.id(), "succeeded", now, null, "raw_text");
+  public void recordSuccess(EffectiveAiSettings effective, Instant now) {
+    if (effective.isUserScoped()) {
+      settings.updateProviderStatus(effective.statusTargetId(), "succeeded", now, null, "raw_text");
+    } else {
+      platformSettingsService.recordGlobalSuccess(now);
+    }
   }
 
-  public void recordFailure(UserAiSettingsRecord row, Instant now, AiClassification classification) {
-    settings.updateProviderStatus(row.id(), "failed", now, classification.value(), null);
+  public void recordFailure(EffectiveAiSettings effective, Instant now, AiClassification classification) {
+    if (effective.isUserScoped()) {
+      settings.updateProviderStatus(effective.statusTargetId(), "failed", now, classification.value(), null);
+    } else {
+      platformSettingsService.recordGlobalFailure(now, classification);
+    }
   }
 
   public static String normalizeBaseUrl(String value) {
@@ -220,7 +235,7 @@ public class SettingsService {
     return normalized;
   }
 
-  private static String firstText(String... values) {
+  public static String firstText(String... values) {
     if (values == null) {
       return null;
     }
@@ -232,7 +247,7 @@ public class SettingsService {
     return null;
   }
 
-  private static String normalizeOrDefault(String value, String defaultValue) {
+  public static String normalizeOrDefault(String value, String defaultValue) {
     String normalized = value == null ? "" : value.trim();
     return normalized.isBlank() ? defaultValue : normalized;
   }

@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS platform_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  writing_provider_name TEXT NOT NULL DEFAULT 'openai-compatible',
+  writing_base_url TEXT NOT NULL DEFAULT 'https://api.openai.com/v1',
+  writing_model_name TEXT NOT NULL DEFAULT 'gpt-4o-mini',
+  writing_api_key_encrypted TEXT NULL,
+  writing_api_key_hint TEXT NULL,
+  writing_json_fallback_enabled INTEGER NOT NULL DEFAULT 1,
+  public_registration_enabled INTEGER NOT NULL DEFAULT 1,
+  content_proposals_enabled INTEGER NOT NULL DEFAULT 1,
+  reject_note_required INTEGER NOT NULL DEFAULT 0,
+  admin_direct_publish_enabled INTEGER NOT NULL DEFAULT 1,
+  content_revert_enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  last_test_status TEXT NULL,
+  last_tested_at TEXT NULL,
+  last_failure_classification TEXT NULL,
+  last_successful_mode TEXT NULL
+);

@@ -5,6 +5,8 @@ import type {
   ProviderModelsResponse,
   ProviderTestResponse,
   WritingAIModelDiscoveryRequest,
+  AdminSettingsResponse,
+  AdminSettingsUpdate,
 } from '../types/api';
 
 export const settingsService = {
@@ -37,6 +39,32 @@ export const settingsService = {
    */
   testConnection: async (): Promise<ProviderTestResponse> => {
     return apiClient.post<ProviderTestResponse>('/api/v1/settings/writing-ai/test', {});
+  },
+
+  getAdminSettings: async (): Promise<AdminSettingsResponse> => {
+    return apiClient.get<AdminSettingsResponse>('/api/v1/admin/settings');
+  },
+
+  updateAdminSettings: async (
+    data: AdminSettingsUpdate
+  ): Promise<AdminSettingsResponse> => {
+    return apiClient.put<AdminSettingsResponse>('/api/v1/admin/settings', data);
+  },
+
+  discoverAdminModels: async (
+    data?: WritingAIModelDiscoveryRequest
+  ): Promise<ProviderModelsResponse> => {
+    return apiClient.post<ProviderModelsResponse>(
+      '/api/v1/admin/settings/writing-ai/models',
+      data || {}
+    );
+  },
+
+  testAdminConnection: async (): Promise<ProviderTestResponse> => {
+    return apiClient.post<ProviderTestResponse>(
+      '/api/v1/admin/settings/writing-ai/test',
+      {}
+    );
   },
 };
 

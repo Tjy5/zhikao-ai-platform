@@ -6,7 +6,7 @@
  *  - Writing:     WritingDtos.java (WritingSubmission, RawWritingFeedbackResult),
  *                 WritingController.java (grade, grade-progressive SSE shape)
  *  - History:     HistoryService.java (summary / detail / clear / delete)
- *  - Settings:    WritingAISettings controller + DTOs
+ *  - Settings:    WritingAISettings controller + DTOs; AdminSettingsDtos.java
  *
  * Load-bearing realities (design.md §9, prd.md backend table):
  *  - Grading response is a single `content` (markdown) + `contentFormat`.
@@ -103,6 +103,24 @@ export interface ProviderTestResponse {
   last_successful_mode: string | null;
   last_failure_classification: string | null;
   message: string;
+}
+
+export interface OperationPolicySettings {
+  public_registration_enabled: boolean;
+  content_proposals_enabled: boolean;
+  reject_note_required: boolean;
+  admin_direct_publish_enabled: boolean;
+  content_revert_enabled: boolean;
+}
+
+export interface AdminSettingsResponse {
+  writing_ai: WritingAISettingsResponse;
+  operation_policy: OperationPolicySettings;
+}
+
+export interface AdminSettingsUpdate {
+  writing_ai: WritingAISettingsUpdate;
+  operation_policy: OperationPolicySettings;
 }
 
 // Writing types

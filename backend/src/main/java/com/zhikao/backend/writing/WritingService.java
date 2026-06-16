@@ -4,7 +4,7 @@ import com.zhikao.backend.ai.AiHttpException;
 import com.zhikao.backend.ai.AiProvider;
 import com.zhikao.backend.ai.AiProviderException;
 import com.zhikao.backend.common.Clock;
-import com.zhikao.backend.data.UserAiSettingsRecord;
+import com.zhikao.backend.settings.EffectiveAiSettings;
 import com.zhikao.backend.settings.SettingsService;
 import com.zhikao.backend.writing.WritingDtos.RawWritingFeedbackResult;
 import com.zhikao.backend.writing.WritingDtos.WritingSubmission;
@@ -32,20 +32,20 @@ public class WritingService {
 
   @Transactional
   public RawWritingFeedbackResult grade(long userId, WritingSubmission submission, String kind) {
-    UserAiSettingsRecord row = null;
+    EffectiveAiSettings effective = null;
     Instant now = clock.now();
     try {
-      row = settingsService.requireConfiguredSettings(userId);
+      effective = settingsService.requireEffectiveSettings(userId);
       String content =
           aiProvider.gradeWritingRaw(
-              settingsService.providerConfig(row), submission.content(), submission.taskType());
+              settingsService.providerConfig(effective), submission.content(), submission.taskType());
       RawWritingFeedbackResult result = new RawWritingFeedbackResult(content);
-      settingsService.recordSuccess(row, now);
+      settingsService.recordSuccess(effective, now);
       historyService.append(userId, kind, submission, result);
       return result;
     } catch (AiProviderException error) {
-      if (row != null) {
-        settingsService.recordFailure(row, now, error.classification());
+      if (effective != null) {
+        settingsService.recordFailure(effective, now, error.classification());
       }
       throw new AiHttpException(error.classification());
     }
