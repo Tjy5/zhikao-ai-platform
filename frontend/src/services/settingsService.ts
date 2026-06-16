@@ -7,6 +7,7 @@ import type {
   WritingAIModelDiscoveryRequest,
   AdminSettingsResponse,
   AdminSettingsUpdate,
+  OperationPolicySettings,
 } from '../types/api';
 
 export const settingsService = {
@@ -39,6 +40,12 @@ export const settingsService = {
    */
   testConnection: async (): Promise<ProviderTestResponse> => {
     return apiClient.post<ProviderTestResponse>('/api/v1/settings/writing-ai/test', {});
+  },
+
+  getOperationPolicy: async (): Promise<OperationPolicySettings> => {
+    return apiClient.get<OperationPolicySettings>(
+      '/api/v1/settings/operation-policy'
+    );
   },
 
   getAdminSettings: async (): Promise<AdminSettingsResponse> => {

@@ -194,6 +194,27 @@ class AdminSettingsContractTests extends IntegrationTestSupport {
   }
 
   @Test
+  void operationPolicyEndpointIsReadableByAuthenticatedUsers() throws Exception {
+    Session admin = registerAndLoginAdmin("admin_settings_policy_read_admin");
+    Session user = registerAndLogin("admin_settings_policy_read_user");
+
+    saveAdminSettings(admin, null, null, null, policy(true, false, true, false, false))
+        .andExpect(status().isOk());
+
+    mockMvc.perform(get("/api/v1/settings/operation-policy")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/settings/operation-policy").header("Authorization", user.authHeader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.public_registration_enabled").value(true))
+        .andExpect(jsonPath("$.content_proposals_enabled").value(false))
+        .andExpect(jsonPath("$.reject_note_required").value(true))
+        .andExpect(jsonPath("$.admin_direct_publish_enabled").value(false))
+        .andExpect(jsonPath("$.content_revert_enabled").value(false))
+        .andExpect(jsonPath("$.writing_ai").doesNotExist())
+        .andExpect(jsonPath("$.api_key").doesNotExist());
+  }
+
+  @Test
   void operationPolicyBlocksRegistrationProposalsRejectWithoutNoteDirectEditAndRevert() throws Exception {
     Session admin = registerAndLoginAdmin("admin_settings_policy_admin");
     Session user = registerAndLogin("admin_settings_policy_user");

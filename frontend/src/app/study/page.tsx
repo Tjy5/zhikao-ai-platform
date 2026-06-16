@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
@@ -6,9 +6,8 @@ import { Toast, type ToastType } from '../../components/ui/Toast';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { SectionView } from '../../components/study/SectionView';
 import { SectionEditor } from '../../components/study/SectionEditor';
-import { RevisionHistory } from '../../components/study/RevisionHistory';
-import { AdminReviewQueue } from '../../components/study/AdminReviewQueue';
 import { useAuth } from '../../hooks/useAuth';
+import { useOperationPolicy } from '../../hooks/useOperationPolicy';
 import { useStudySections } from '../../hooks/useStudySections';
 import { studyService } from '../../services/studyService';
 import { AppError, ErrorType } from '../../types/domain';
@@ -23,18 +22,16 @@ import type { SectionKey } from '../../types/api';
 export { BASELINE_SECTIONS };
 
 /**
- * /app/study — 申论学习 read+edit view. design.md (study-read-page) §3 + parent
- * design.md §5/§6/§10/§12 + child-4 (study-edit-ui) design.md.
+ * /app/study — learner-facing 申论学习 read + proposal view.
  *
  * Read path: `useStudySections()` is API-first with a packed-baseline fallback
  * — the page is NEVER blank. On API failure/empty it renders the baseline
- * content normally and shows a small mono note; edit/history/review controls
- * are hidden in that state (no API = no writes).
+ * content normally and shows a small mono note; proposal controls are hidden in
+ * that state (no API = no writes).
  *
- * Edit path (child-4): per-section controls gated on `useAuth().isAdmin`:
- *  - user  → 「提交修改建议」(propose; read page unchanged, toast on submit)
- *  - admin → 「编辑」(direct_edit; immediate) + 「历史」(revisions drawer)
- *  - admin → page-head 「审核队列」entry (GET /proposals; approve/reject)
+ * Proposal path: normal users can submit suggestions only when the operation
+ * policy allows content proposals. Admin governance lives under `/admin/study/*`;
+ * this learner page only links admins there.
  *
  * Anti-pattern compliance (design.md §12) is preserved verbatim from child-1:
  * inline mono stat strip (not big-number cards), gap-px divider grids for real
@@ -71,11 +68,7 @@ function ArrowRight({ className = '' }: { className?: string }) {
 function studyWriteMessage(error: unknown, fallback: string): string {
   if (error instanceof AppError) {
     const status = (error.details as { status?: number } | undefined)?.status;
-    // apiClient maps 403 → ErrorType.AUTH, which the generic helper would render
-    // as "登录已过期" — misleading for an admin-gated study write. Show the real
-    // cause instead. (Admin controls are client-gated by isAdmin, so this is a
-    // safety net for stale role state.)
-    if (status === 403) return '需要管理员权限才能执行此操作';
+    if (status === 403) return '当前已关闭内容提案提交';
     if (error.type === ErrorType.AUTH) return '登录已过期，请重新登录';
     return error.message || fallback;
   }
@@ -88,7 +81,7 @@ function studyWriteMessage(error: unknown, fallback: string): string {
 
 interface EditorState {
   key: SectionKey;
-  mode: 'propose' | 'edit';
+  mode: 'propose';
 }
 
 function EditorOverlay({
@@ -150,12 +143,16 @@ function EditorOverlay({
 
 export default function StudyPage() {
   const { isAdmin } = useAuth();
-  const { phase, sections, error, reload } = useStudySections();
+  const { phase, sections, error } = useStudySections();
+  const {
+    phase: policyPhase,
+    policy,
+    error: policyError,
+    reload: reloadPolicy,
+  } = useOperationPolicy();
 
   // Overlays.
   const [editor, setEditor] = useState<EditorState | null>(null);
-  const [historyKey, setHistoryKey] = useState<SectionKey | null>(null);
-  const [reviewOpen, setReviewOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Toast.
@@ -170,53 +167,21 @@ export default function StudyPage() {
     []
   );
 
-  // Pending-proposal count for the admin badge. Fetched only when admin AND the
-  // sections API is reachable (phase==='ready'); re-fetched when the review
-  // drawer closes (approvals may have changed it).
-  const [pendingCount, setPendingCount] = useState<number | null>(null);
-  const countReqIdRef = useRef(0);
-  const fetchPendingCount = useCallback(() => {
-    if (!isAdmin) return;
-    const reqId = ++countReqIdRef.current;
-    studyService
-      .getProposals({ limit: 1, offset: 0 })
-      .then((resp) => {
-        if (reqId !== countReqIdRef.current) return;
-        setPendingCount(resp?.total ?? 0);
-      })
-      .catch(() => {
-        if (reqId !== countReqIdRef.current) return;
-        setPendingCount(null);
-      });
-  }, [isAdmin]);
-
-  useEffect(() => {
-    if (isAdmin && phase === 'ready') fetchPendingCount();
-  }, [isAdmin, phase, fetchPendingCount]);
-
-  // ----- Submit handler (propose / edit) with 403 special-case -----
+  // ----- Submit handler with 403 policy special-case -----
   const handleSubmit = useCallback(
     async (payload: { contentJson: unknown; changeSummary?: string }) => {
       if (!editor) return;
+      if (policyPhase !== 'ready' || !policy?.content_proposals_enabled) {
+        showToast('当前暂不可提交修改建议', 'warning');
+        return;
+      }
       try {
         setIsSubmitting(true);
-        if (editor.mode === 'edit') {
-          await studyService.edit(editor.key, {
-            content_json: payload.contentJson,
-            change_summary: payload.changeSummary,
-          });
-          showToast('已保存，即时生效', 'success');
-          reload(); // live content updated
-        } else {
-          await studyService.propose(editor.key, {
-            content_json: payload.contentJson,
-            change_summary: payload.changeSummary,
-          });
-          showToast('已提交修改建议，待管理员审核', 'success');
-          // Read page unchanged; refresh the admin badge in case the actor is
-          // an admin proposing (rare but possible).
-          if (isAdmin) fetchPendingCount();
-        }
+        await studyService.propose(editor.key, {
+          content_json: payload.contentJson,
+          change_summary: payload.changeSummary,
+        });
+        showToast('已提交修改建议，待管理员审核', 'success');
         setEditor(null);
       } catch (err) {
         showToast(studyWriteMessage(err, '提交失败，请重试'), 'error');
@@ -224,29 +189,39 @@ export default function StudyPage() {
         setIsSubmitting(false);
       }
     },
-    [editor, showToast, reload, isAdmin, fetchPendingCount]
+    [editor, policyPhase, policy?.content_proposals_enabled, showToast]
   );
 
-  // Controls are visible only when the API is reachable (phase==='ready'). In
-  // fallback there is no API to write to, so hide edit/history/review.
+  // Controls are visible only when the sections API is reachable. In fallback
+  // there is no API to write to, so hide proposal/admin-link affordances.
   const showControls = phase === 'ready';
+  const proposalsEnabled =
+    policyPhase === 'ready' && !!policy?.content_proposals_enabled;
+
+  const proposalUnavailableCopy =
+    policyPhase === 'loading'
+      ? '正在确认修改建议开放状态'
+      : policyPhase === 'error'
+        ? '暂时无法读取提案策略，修改建议入口暂不可用'
+        : '修改建议暂未开放';
 
   const renderSectionActions = (key: SectionKey): ReactNode => {
     if (!showControls) return undefined;
     if (isAdmin) {
       return (
-        <>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setEditor({ key, mode: 'edit' })}
-          >
-            编辑
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setHistoryKey(key)}>
-            历史
-          </Button>
-        </>
+        <Link
+          to={`/admin/study/sections/${key}`}
+          className="inline-flex h-9 items-center justify-center rounded-md border border-ink px-3 text-[13px] font-medium text-ink transition-ui hover:bg-panel"
+        >
+          治理此区段
+        </Link>
+      );
+    }
+    if (!proposalsEnabled) {
+      return (
+        <span className="max-w-[16rem] text-right text-[12px] text-mute leading-relaxed">
+          {proposalUnavailableCopy}
+        </span>
       );
     }
     return (
@@ -260,10 +235,12 @@ export default function StudyPage() {
     );
   };
 
+  const showProposalNotice =
+    showControls && !isAdmin && policyPhase !== 'loading' && !proposalsEnabled;
+
   return (
     <div className="space-y-14 md:space-y-20">
-      {/* ===== HERO — page head + inline mono stat strip + dual CTA
-              (byte-identical to child-1; admin review entry appended) ===== */}
+      {/* ===== HERO — page head + inline mono stat strip + learner CTAs ===== */}
       <section aria-labelledby="study-hero-title">
         <div className="text-[11px] font-semibold tracking-[0.02em] text-oxblood">
           申论学习 · 知识地图
@@ -304,7 +281,6 @@ export default function StudyPage() {
           </span>
         </div>
 
-        {/* Dual CTAs + admin-only review queue entry. */}
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Link
             to="/app/writing"
@@ -320,17 +296,45 @@ export default function StudyPage() {
             看批改历史
           </Link>
           {isAdmin && showControls && (
-            <Button
-              variant="outline"
-              size="md"
-              className="ml-auto"
-              onClick={() => setReviewOpen(true)}
-            >
-              审核队列
-              {pendingCount !== null ? `（${pendingCount}）` : ''}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+              <Link
+                to="/admin/study"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-ink px-4 text-[13px] font-medium text-ink transition-ui hover:bg-panel"
+              >
+                内容治理
+              </Link>
+              <Link
+                to="/admin/study/reviews"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-[13px] font-medium text-ink transition-ui hover:bg-panel"
+              >
+                审核队列
+              </Link>
+            </div>
           )}
         </div>
+
+        {showProposalNotice && (
+          <div
+            role="status"
+            className="mt-4 rounded-md border border-line bg-panel/60 px-4 py-2.5 text-[12.5px] text-mute leading-relaxed"
+          >
+            {policyPhase === 'error' ? (
+              <>
+                {policyError || '暂时无法读取提案策略'}，修改建议入口暂不可用。
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-2"
+                  onClick={reloadPolicy}
+                >
+                  重试
+                </Button>
+              </>
+            ) : (
+              '当前平台已关闭学习内容修改建议，学习内容仍可正常阅读。'
+            )}
+          </div>
+        )}
       </section>
 
       {/* ===== Loading skeleton (brief; first fetch) ===== */}
@@ -362,7 +366,7 @@ export default function StudyPage() {
               className="rounded-md border border-line bg-panel/60 px-4 py-2.5 text-[11.5px] font-mono text-mute leading-relaxed"
             >
               内容来自本地缓存{error ? '（无法连接服务器）' : '（暂无在线内容）'}。
-              编辑、历史与审核功能在连接恢复后可用。
+              修改建议入口会在连接恢复且平台开放提案后可用。
             </div>
           )}
           {SECTION_ORDER.map((key) => (
@@ -386,26 +390,6 @@ export default function StudyPage() {
           onClose={() => !isSubmitting && setEditor(null)}
         />
       )}
-
-      {/* ===== Revision history drawer (admin entry via per-section 历史) ===== */}
-      <RevisionHistory
-        sectionKey={historyKey ?? 'study-route'}
-        isOpen={historyKey !== null}
-        onClose={() => setHistoryKey(null)}
-        isAdmin={isAdmin}
-        onReverted={reload}
-      />
-
-      {/* ===== Admin review queue ===== */}
-      <AdminReviewQueue
-        isOpen={reviewOpen}
-        onClose={() => {
-          setReviewOpen(false);
-          // Refresh the badge count after closing (approvals may have changed).
-          fetchPendingCount();
-        }}
-        onApproveApplied={reload}
-      />
 
       {/* ===== Toast ===== */}
       {toast.show && (

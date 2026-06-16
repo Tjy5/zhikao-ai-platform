@@ -53,6 +53,10 @@ public class PlatformSettingsService {
     return toAdminResponse(current());
   }
 
+  public OperationPolicyResponse getOperationPolicy() {
+    return toOperationPolicyResponse(current());
+  }
+
   @Transactional
   public AdminSettingsResponse updateAdminSettings(AdminSettingsUpdate request) {
     current();
@@ -218,14 +222,16 @@ public class PlatformSettingsService {
   }
 
   private AdminSettingsResponse toAdminResponse(PlatformSettingsRecord row) {
-    return new AdminSettingsResponse(
-        toWritingResponse(row),
-        new OperationPolicyResponse(
-            row.publicRegistrationEnabled(),
-            row.contentProposalsEnabled(),
-            row.rejectNoteRequired(),
-            row.adminDirectPublishEnabled(),
-            row.contentRevertEnabled()));
+    return new AdminSettingsResponse(toWritingResponse(row), toOperationPolicyResponse(row));
+  }
+
+  private OperationPolicyResponse toOperationPolicyResponse(PlatformSettingsRecord row) {
+    return new OperationPolicyResponse(
+        row.publicRegistrationEnabled(),
+        row.contentProposalsEnabled(),
+        row.rejectNoteRequired(),
+        row.adminDirectPublishEnabled(),
+        row.contentRevertEnabled());
   }
 
   private PlatformSettingsRecord createDefaultRow() {
