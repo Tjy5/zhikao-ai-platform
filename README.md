@@ -14,6 +14,20 @@
 - **内容治理**：通过内容包 manifest、来源声明、许可证声明和 Java 后端校验器管理公开示例内容。
 - **离线 AI 回归**：用原创写作任务和确定性 Markdown fixture 校验反馈结构、rubric 覆盖和可执行建议，不依赖真实 LLM key。
 
+## 页面预览
+
+| 首页 | 概览 |
+|------|------|
+| ![成公首页截图](docs/screenshots/home.png) | ![成公概览页截图](docs/screenshots/dashboard.png) |
+
+| 申论学习 | 申论写作台 |
+|----------|------------|
+| ![申论学习页面截图](docs/screenshots/study.png) | ![申论写作台页面截图](docs/screenshots/writing.png) |
+
+| 批改历史 | AI 配置 |
+|----------|---------|
+| ![批改历史页面截图](docs/screenshots/history.png) | ![AI 配置页面截图](docs/screenshots/settings.png) |
+
 ## 快速开始
 
 需要 Java 21 和 Node。所有端口、密钥、CORS、数据库路径在 `application.yml` 与前端 `apiClient.ts` 都有 dev 默认值，开箱即用，无需任何环境变量或 `.env` 文件。
